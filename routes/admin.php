@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Controllers\Admin\CategoryController;
+use App\Controllers\Admin\DashboardController;
+use App\Controllers\Admin\OrderController;
+use App\Controllers\Admin\ProductController;
+use App\Core\Router;
+
+return function (Router $router): void {
+    $router->group(['prefix' => '/admin', 'middleware' => ['auth', 'admin'], 'as' => 'admin.'], function (Router $r): void {
+        $r->get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        $r->get('/products', [ProductController::class, 'index'])->name('products.index');
+        $r->get('/products/create', [ProductController::class, 'create'])->name('products.create');
+        $r->post('/products', [ProductController::class, 'store'])->name('products.store');
+        $r->get('/products/{id:\d+}/edit', [ProductController::class, 'edit'])->name('products.edit');
+        $r->put('/products/{id:\d+}', [ProductController::class, 'update'])->name('products.update');
+        $r->delete('/products/{id:\d+}', [ProductController::class, 'destroy'])->name('products.destroy');
+        // Xoá mềm: thùng rác, khôi phục, xoá vĩnh viễn
+        $r->get('/products/trash', [ProductController::class, 'trash'])->name('products.trash');
+        $r->post('/products/{id:\d+}/restore', [ProductController::class, 'restore'])->name('products.restore');
+        $r->delete('/products/{id:\d+}/force', [ProductController::class, 'forceDestroy'])->name('products.force');
+        // Biến thể động
+        $r->post('/products/{id:\d+}/options', [ProductController::class, 'saveOptions'])->name('products.options');
+        $r->post('/products/{id:\d+}/variants', [ProductController::class, 'saveVariants'])->name('products.variants');
+
+        $r->get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+        $r->post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+        $r->put('/categories/{id:\d+}', [CategoryController::class, 'update'])->name('categories.update');
+        $r->delete('/categories/{id:\d+}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+
+        $r->get('/orders', [OrderController::class, 'index'])->name('orders.index');
+        $r->get('/orders/{id:\d+}', [OrderController::class, 'show'])->name('orders.show');
+        $r->post('/orders/{id:\d+}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
+        $r->post('/orders/{id:\d+}/payments/{paymentId:\d+}/reconcile', [OrderController::class, 'reconcile'])->name('orders.reconcile');
+    });
+};

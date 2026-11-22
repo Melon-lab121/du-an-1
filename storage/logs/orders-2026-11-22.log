@@ -1,0 +1,78 @@
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH26112290FAFE {"total":1980000}
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH2611227E4F3A {"total":189000}
+[2026-11-22 00:08:00] orders.INFO: Đơn đã thanh toán DH2611227E4F3A 
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH2611222C6655 {"total":189000}
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH261122936742 {"total":189000}
+[2026-11-22 00:08:00] orders.INFO: Đơn đã thanh toán DH261122936742 
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH2611229575E0 {"total":189000}
+[2026-11-22 00:08:00] orders.INFO: Đơn đã thanh toán DH2611229575E0 
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH261122401E96 {"total":996000}
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH2611224250EC {"total":150000}
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH2611221D5D0B {"total":110000}
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH261122592FA6 {"total":1050000}
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH2611229BCBCE {"total":360000}
+[2026-11-22 00:08:00] orders.INFO: Đơn mới DH261122A7E316 {"total":1180000}
+[2026-11-22 00:08:00] orders.INFO: Đơn đã thanh toán DH261122A7E316 
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH26112214D489 {"total":1980000}
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH2611228CB438 {"total":189000}
+[2026-11-22 00:11:48] orders.INFO: Đơn đã thanh toán DH2611228CB438 
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH261122039B1B {"total":189000}
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH26112270A92F {"total":189000}
+[2026-11-22 00:11:48] orders.INFO: Đơn đã thanh toán DH26112270A92F 
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH261122C490BE {"total":189000}
+[2026-11-22 00:11:48] orders.INFO: Đơn đã thanh toán DH261122C490BE 
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH2611226C293A {"total":996000}
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH261122438CBD {"total":150000}
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH261122C57A84 {"total":110000}
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH261122120D12 {"total":1050000}
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH2611221D50C6 {"total":360000}
+[2026-11-22 00:11:48] orders.INFO: Đơn mới DH2611225FD4B5 {"total":1180000}
+[2026-11-22 00:11:48] orders.INFO: Đơn đã thanh toán DH2611225FD4B5 
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122AB651F {"total":1980000}
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH26112205A23B {"total":189000}
+[2026-11-22 00:20:54] orders.INFO: Đơn đã thanh toán DH26112205A23B 
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122F7C833 {"total":189000}
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH2611229F1C38 {"total":189000}
+[2026-11-22 00:20:54] orders.INFO: Đơn đã thanh toán DH2611229F1C38 
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH2611228DCE03 {"total":189000}
+[2026-11-22 00:20:54] orders.INFO: Đơn đã thanh toán DH2611228DCE03 
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122D6D7DF {"total":996000}
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122E3F119 {"total":150000}
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122C1C91B {"total":110000}
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122F3DC7F {"total":1050000}
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122C7723A {"total":360000}
+[2026-11-22 00:20:54] orders.INFO: Đơn mới DH261122507C9F {"total":1180000}
+[2026-11-22 00:20:54] orders.INFO: Đơn đã thanh toán DH261122507C9F 
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH261122A193E5 {"total":1980000}
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH261122DDC3DB {"total":189000}
+[2026-11-22 00:35:07] orders.INFO: Đơn đã thanh toán DH261122DDC3DB 
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH2611223F7168 {"total":189000}
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH26112247F2B9 {"total":189000}
+[2026-11-22 00:35:07] orders.INFO: Đơn đã thanh toán DH26112247F2B9 
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH261122ACDA54 {"total":189000}
+[2026-11-22 00:35:07] orders.INFO: Đơn đã thanh toán DH261122ACDA54 
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH261122878053 {"total":996000}
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH261122BF17FC {"total":150000}
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH2611221EE0FA {"total":110000}
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH261122FE80FD {"total":1050000}
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH261122062C0C {"total":360000}
+[2026-11-22 00:35:07] orders.INFO: Đơn mới DH2611220994EC {"total":1180000}
+[2026-11-22 00:35:07] orders.INFO: Đơn đã thanh toán DH2611220994EC 
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH2611227CBAD1 {"total":1980000}
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH2611221DDA2F {"total":189000}
+[2026-11-22 00:45:51] orders.INFO: Đơn đã thanh toán DH2611221DDA2F 
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH261122B0FC25 {"total":189000}
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH261122FDCA9A {"total":189000}
+[2026-11-22 00:45:51] orders.INFO: Đơn đã thanh toán DH261122FDCA9A 
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH261122A245B6 {"total":189000}
+[2026-11-22 00:45:51] orders.INFO: Đơn đã thanh toán DH261122A245B6 
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH2611229ECDE9 {"total":996000}
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH26112293FB56 {"total":150000}
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH261122004479 {"total":110000}
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH261122F928CF {"total":1050000}
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH261122D85781 {"total":360000}
+[2026-11-22 00:45:51] orders.INFO: Đơn mới DH261122A9F554 {"total":1180000}
+[2026-11-22 00:45:51] orders.INFO: Đơn đã thanh toán DH261122A9F554 
+[2026-11-22 00:47:55] orders.INFO: Đơn mới DH261122DB7BA5 {"total":1499750}
+[2026-11-22 00:48:09] orders.INFO: Đơn đã thanh toán DH261122DB7BA5 
+[2026-11-22 23:56:07] orders.INFO: Đơn mới DH261122301CFB {"total":12475000}
