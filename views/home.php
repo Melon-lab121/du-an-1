@@ -14,8 +14,8 @@
         <div class="hero-art" aria-hidden="true">
             <div class="orb orb-1"></div><div class="orb orb-2"></div>
             <div class="glass-card">
-                <small>Đơn hàng #DH2611</small>
-                <strong>Thanh toán thành công</strong>
+                <small>Thanh toán VietQR Napas 24/7</small>
+                <strong>Miễn phí vận chuyển toàn quốc</strong>
                 <span class="pill pill-success">SePay ✓</span>
             </div>
         </div>
