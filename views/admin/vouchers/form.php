@@ -45,9 +45,9 @@ $checkedProds = old('product_ids', $selectedProductIds ?? []);
             <!-- Bộ chọn danh mục áp dụng -->
             <div class="field field-full" id="box-categories" style="<?= $vType === 1 ? '' : 'display: none;' ?>">
                 <span style="font-weight: 600; display: block; margin-bottom: 6px;">Chọn danh mục áp dụng</span>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 180px; overflow-y: auto; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 180px; overflow-y: auto; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text);">
                     <?php foreach ($categories as $cat): ?>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text); padding: 4px; border-radius: 4px;">
                             <input type="checkbox" name="category_ids[]" value="<?= (int) $cat['id'] ?>" <?= in_array((int) $cat['id'], $checkedCats, true) ? 'checked' : '' ?>>
                             <span><?= e($cat['name']) ?></span>
                         </label>
@@ -59,11 +59,11 @@ $checkedProds = old('product_ids', $selectedProductIds ?? []);
             <!-- Bộ chọn sản phẩm áp dụng -->
             <div class="field field-full" id="box-products" style="<?= $vType === 2 ? '' : 'display: none;' ?>">
                 <span style="font-weight: 600; display: block; margin-bottom: 6px;">Chọn sản phẩm áp dụng</span>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; max-height: 220px; overflow-y: auto; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; max-height: 220px; overflow-y: auto; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text);">
                     <?php foreach ($products as $prod): ?>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text); padding: 4px; border-radius: 4px;">
                             <input type="checkbox" name="product_ids[]" value="<?= (int) $prod['id'] ?>" <?= in_array((int) $prod['id'], $checkedProds, true) ? 'checked' : '' ?>>
-                            <span><?= e($prod['name']) ?> (<?= money($prod['price']) ?>)</span>
+                            <span><?= e($prod['name']) ?> <small class="muted">(<?= money($prod['price']) ?>)</small></span>
                         </label>
                     <?php endforeach ?>
                 </div>
