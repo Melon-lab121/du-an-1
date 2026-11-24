@@ -1,0 +1,12 @@
+# Khi đặt project trong htdocs (http://localhost/base), chuyển mọi request vào thư mục public/
+# => code, .env, database... nằm ngoài document root, không truy cập được từ trình duyệt.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
