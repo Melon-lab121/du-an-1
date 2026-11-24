@@ -269,6 +269,15 @@ final class VoucherService
             }
         }
 
+        // Giới hạn số tiền giảm tối đa (nếu có thiết lập max_discount_amount)
+        $maxDiscount = (int) ($voucher['max_discount_amount'] ?? 0);
+        if ($maxDiscount > 0 && $discount > $maxDiscount) {
+            $discount = $maxDiscount;
+            if (!str_contains($description, 'tối đa')) {
+                $description .= ' (tối đa ' . money($maxDiscount) . ')';
+            }
+        }
+
         $discount = max(0, $discount);
 
         return [

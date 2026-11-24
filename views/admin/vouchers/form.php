@@ -87,6 +87,13 @@ $checkedProds = old('product_ids', $selectedProductIds ?? []);
             </label>
 
             <label class="field">
+                <span>Giảm tối đa (₫)</span>
+                <input type="number" name="max_discount_amount" value="<?= e($field('max_discount_amount', '')) ?>" min="0" step="1000" placeholder="VD: 500000 (để trống nếu không giới hạn)">
+                <?php if ($err = error('max_discount_amount')): ?><small class="error"><?= e($err) ?></small><?php endif ?>
+                <small class="muted">Số tiền giảm tối đa (đặc biệt hữu ích cho mã giảm theo %)</small>
+            </label>
+
+            <label class="field">
                 <span>Chi tiêu tối thiểu (₫)</span>
                 <input type="number" name="min_spending" value="<?= e($field('min_spending', 0)) ?>" min="0" step="1000" placeholder="0">
                 <?php if ($err = error('min_spending')): ?><small class="error"><?= e($err) ?></small><?php endif ?>

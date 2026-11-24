@@ -53,6 +53,7 @@ final class VoucherController extends Controller
             'voucher_type' => $data['voucher_type'],
             'discount_type' => $data['discount_type'],
             'discount_value' => $data['discount_value'],
+            'max_discount_amount' => $data['max_discount_amount'],
             'min_spending' => $data['min_spending'],
             'max_usage_per_user' => $data['max_usage_per_user'],
             'start_date' => $data['start_date'],
@@ -97,6 +98,7 @@ final class VoucherController extends Controller
             'voucher_type' => $data['voucher_type'],
             'discount_type' => $data['discount_type'],
             'discount_value' => $data['discount_value'],
+            'max_discount_amount' => $data['max_discount_amount'],
             'min_spending' => $data['min_spending'],
             'max_usage_per_user' => $data['max_usage_per_user'],
             'start_date' => $data['start_date'],
@@ -153,6 +155,7 @@ final class VoucherController extends Controller
             'voucher_type' => 'required|integer',
             'discount_type' => 'required|integer',
             'discount_value' => 'required|integer|min:1',
+            'max_discount_amount' => 'nullable|integer|min:0',
             'min_spending' => 'nullable|integer|min:0',
             'max_usage_per_user' => 'nullable|integer|min:1',
             'start_date' => 'required|string',
@@ -172,6 +175,7 @@ final class VoucherController extends Controller
         $data['voucher_type'] = (int) $data['voucher_type'];
         $data['discount_type'] = (int) $data['discount_type'];
         $data['discount_value'] = (int) $data['discount_value'];
+        $data['max_discount_amount'] = !empty($request->input('max_discount_amount')) ? (int) $request->input('max_discount_amount') : null;
         $data['min_spending'] = (int) ($data['min_spending'] ?? 0);
         $data['max_usage_per_user'] = (int) ($data['max_usage_per_user'] ?? 1);
         $data['is_active'] = $request->input('is_active') ? 1 : 0;

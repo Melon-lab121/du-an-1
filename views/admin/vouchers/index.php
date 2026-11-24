@@ -50,6 +50,9 @@
                     <td>
                         <?php if ((int)$v['discount_type'] === 1): ?>
                             <strong><?= (int)$v['discount_value'] ?>%</strong>
+                            <?php if (!empty($v['max_discount_amount'])): ?>
+                                <br><small class="muted">Tối đa <?= money($v['max_discount_amount']) ?></small>
+                            <?php endif ?>
                         <?php else: ?>
                             <strong><?= money($v['discount_value']) ?></strong>
                         <?php endif ?>

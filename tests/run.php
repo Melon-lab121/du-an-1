@@ -913,6 +913,29 @@ T::test('Voucher: giảm theo phần trăm và số tiền cố định', functi
     $res = $voucherService->evaluate('FIXED50K', [['product_id' => 1, 'total' => 200000]]);
     T::true($res['valid']);
     T::eq(50000, $res['discount']);
+
+    // Giảm 30% nhưng tối đa 500.000đ trên đơn 10 triệu
+    App\Models\Voucher::create([
+        'code' => 'CAP30PERCENT',
+        'voucher_type' => 1,
+        'discount_type' => 1,
+        'discount_value' => 30,
+        'max_discount_amount' => 500000,
+        'min_spending' => 0,
+        'max_usage_per_user' => 5,
+        'start_date' => '2026-01-01 00:00:00',
+        'end_date' => '2027-12-31 23:59:59',
+        'is_active' => 1,
+    ]);
+    // Đơn 10.000.000đ: 30% là 3.000.000đ, nhưng trần tối đa là 500.000đ => giảm đúng 500.000đ
+    $resCap = $voucherService->evaluate('CAP30PERCENT', [['product_id' => 1, 'total' => 10000000]]);
+    T::true($resCap['valid']);
+    T::eq(500000, $resCap['discount']);
+
+    // Đơn 1.000.000đ: 30% là 300.000đ (chưa vượt trần 500.000đ) => giảm 300.000đ
+    $resNoCap = $voucherService->evaluate('CAP30PERCENT', [['product_id' => 1, 'total' => 1000000]]);
+    T::true($resNoCap['valid']);
+    T::eq(300000, $resNoCap['discount']);
 });
 
 T::test('Voucher: giảm theo danh mục và theo sản phẩm', function () use ($app) {
