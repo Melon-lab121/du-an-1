@@ -13,6 +13,7 @@ use App\Core\Session;
 use App\Core\View;
 use App\Services\Auth;
 use App\Services\CartService;
+use App\Services\VoucherService;
 
 /**
  * Hàm tiện ích toàn cục. Chỉ khai báo khi chưa tồn tại để module có thể override.
@@ -197,6 +198,13 @@ if (!function_exists('cart')) {
     function cart(): CartService
     {
         return app(CartService::class);
+    }
+}
+
+if (!function_exists('voucher')) {
+    function voucher(): VoucherService
+    {
+        return app(VoucherService::class);
     }
 }
 

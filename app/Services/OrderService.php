@@ -86,7 +86,8 @@ final class OrderService
             }
 
             $subtotal = array_sum(array_column($lines, 'total'));
-            $discount = (int) $this->events->filter('order.discount', 0, ['lines' => $lines, 'subtotal' => $subtotal, 'customer' => $customer]);
+            $discount = (int) $this->events->filter('order.discount', 0, ['lines' => $lines, 'subtotal' => $subtotal, 'customer' => $customer, 'userId' => $userId]);
+            $voucherCode = (string) $this->events->filter('order.voucher_code', '', ['customer' => $customer, 'userId' => $userId]);
             $totals = PriceCalculator::totals(
                 $lines,
                 (int) $this->config->get('shop.shipping_fee', 0),
@@ -106,6 +107,7 @@ final class OrderService
                 'subtotal' => $totals['subtotal'],
                 'shipping_fee' => $totals['shipping_fee'],
                 'discount' => $totals['discount'],
+                'voucher_code' => $voucherCode !== '' ? $voucherCode : null,
                 'total' => $totals['total'],
                 'payment_method' => $paymentMethod,
                 'payment_status' => 'unpaid',

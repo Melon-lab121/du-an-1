@@ -9,6 +9,7 @@ use App\Controllers\HomeController;
 use App\Controllers\OrderController;
 use App\Controllers\PaymentController;
 use App\Controllers\ProductController;
+use App\Controllers\VoucherController;
 use App\Core\Router;
 
 return function (Router $router): void {
@@ -24,6 +25,10 @@ return function (Router $router): void {
     $router->post('/cart/add', [CartController::class, 'add'])->name('cart.add');
     $router->post('/cart/update', [CartController::class, 'update'])->name('cart.update');
     $router->post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
+
+    // Voucher giảm giá
+    $router->post('/voucher/apply', [VoucherController::class, 'apply'])->name('voucher.apply');
+    $router->post('/voucher/remove', [VoucherController::class, 'remove'])->name('voucher.remove');
 
     // Đặt hàng (cho phép khách vãng lai)
     $router->get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');

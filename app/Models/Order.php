@@ -26,7 +26,7 @@ final class Order extends Model
     protected static string $table = 'orders';
     protected static array $fillable = [
         'code', 'user_id', 'customer_name', 'customer_email', 'customer_phone', 'shipping_address', 'note',
-        'subtotal', 'shipping_fee', 'discount', 'total', 'payment_method', 'payment_status', 'status', 'paid_at',
+        'subtotal', 'shipping_fee', 'discount', 'voucher_code', 'total', 'payment_method', 'payment_status', 'status', 'paid_at',
     ];
 
     /** @return array<string, mixed>|null */
