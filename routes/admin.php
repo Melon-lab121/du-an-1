@@ -31,6 +31,9 @@ return function (Router $router): void {
         $r->post('/categories', [CategoryController::class, 'store'])->name('categories.store');
         $r->put('/categories/{id:\d+}', [CategoryController::class, 'update'])->name('categories.update');
         $r->delete('/categories/{id:\d+}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+        $r->get('/categories/trash', [CategoryController::class, 'trash'])->name('categories.trash');
+        $r->post('/categories/{id:\d+}/restore', [CategoryController::class, 'restore'])->name('categories.restore');
+        $r->delete('/categories/{id:\d+}/force', [CategoryController::class, 'forceDestroy'])->name('categories.force');
 
         $r->get('/orders', [OrderController::class, 'index'])->name('orders.index');
         $r->get('/orders/{id:\d+}', [OrderController::class, 'show'])->name('orders.show');

@@ -15,6 +15,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Router;
 use App\Core\Validator;
+use App\Models\Category;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
@@ -24,6 +25,7 @@ use App\Services\OrderService;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\PaymentManager;
 use App\Services\Payment\SepayGateway;
+use App\Services\DashboardStats;
 use App\Services\PriceCalculator;
 use App\Services\VariantService;
 use Database\Migrator;
@@ -833,6 +835,161 @@ T::test('API JSON /api/products', function () use ($app) {
     T::true($hoodie['has_variants']);
     T::eq(['Màu', 'Size'], array_column($hoodie['options'], 'name'));
     T::eq(6, count($hoodie['variants']));
+});
+
+T::section('Dashboard');
+
+T::test('fillDailyBuckets điền ngày thiếu bằng 0', function () {
+    $today = new DateTimeImmutable('2026-11-25');
+    $filled = DashboardStats::fillDailyBuckets(3, ['2026-11-25' => 150000], ['2026-11-24' => 2], $today);
+    T::eq(['23/11', '24/11', '25/11'], $filled['labels']);
+    T::eq([0, 0, 150000], $filled['revenue']);
+    T::eq([0, 2, 0], $filled['orders']);
+});
+
+T::test('Tổng quan lọc đơn, nhân viên và sản phẩm', function () use ($app, $db) {
+    $stats = new DashboardStats($db);
+    $before = $stats->orderStatusCounts();
+
+    $now = date('Y-m-d H:i:s');
+    $highId = $db->insert('users', [
+        'name' => 'Nhân viên Cao', 'email' => 'staff-cao@example.com', 'password' => 'x',
+        'role' => 'staff', 'created_at' => $now, 'updated_at' => $now,
+    ]);
+    $lowId = $db->insert('users', [
+        'name' => 'Nhân viên Thấp', 'email' => 'staff-thap@example.com', 'password' => 'x',
+        'role' => 'staff', 'created_at' => $now, 'updated_at' => $now,
+    ]);
+
+    $orderBase = [
+        'customer_name' => 'Khách lọc', 'customer_email' => 'loc@example.com', 'customer_phone' => '0900000001',
+        'shipping_address' => 'Q1', 'subtotal' => 0, 'shipping_fee' => 0, 'discount' => 0,
+        'payment_method' => 'cod',
+    ];
+    Order::create($orderBase + [
+        'code' => 'DASH-HIGH', 'user_id' => $highId, 'total' => 500000,
+        'payment_status' => 'paid', 'status' => 'completed',
+    ]);
+    Order::create($orderBase + [
+        'code' => 'DASH-UNPAID', 'user_id' => $highId, 'total' => 900000,
+        'payment_status' => 'unpaid', 'status' => 'pending',
+    ]);
+    Order::create($orderBase + [
+        'code' => 'DASH-LOW', 'user_id' => $lowId, 'total' => 100000,
+        'payment_status' => 'paid', 'status' => 'cancelled',
+    ]);
+
+    $counts = $stats->orderStatusCounts();
+    T::eq($before['completed'] + 1, $counts['completed']);
+    T::eq($before['cancelled'] + 1, $counts['cancelled']);
+    T::eq($before['pending'] + 1, $counts['pending']);
+    T::eq(array_sum($counts), $stats->orderCount(''));
+    T::eq($counts['completed'], $stats->orderCount('completed'));
+    T::true(in_array('DASH-HIGH', array_column($stats->ordersByStatus('completed', 20), 'code'), true));
+    T::false(in_array('DASH-LOW', array_column($stats->ordersByStatus('completed', 20), 'code'), true));
+
+    $ranked = $stats->staffByRevenue('revenue_desc');
+    $positions = array_flip(array_column($ranked, 'id'));
+    T::true($positions[$highId] < $positions[$lowId]);
+    $byId = [];
+    foreach ($ranked as $row) {
+        $byId[$row['id']] = $row;
+    }
+    T::eq(500000, $byId[$highId]['revenue']);
+    T::eq(2, $byId[$highId]['order_count']);
+    T::eq(100000, $byId[$lowId]['revenue']);
+
+    $asc = array_flip(array_column($stats->staffByRevenue('revenue_asc'), 'id'));
+    T::true($asc[$lowId] < $asc[$highId]);
+
+    $hot = product('tai-nghe-bluetooth-anc');
+    $cold = product('chuot-khong-day-silent');
+    Product::updateById((int) $cold['id'], ['stock' => 0]);
+    $soldBefore = 0;
+    foreach ($stats->productsFiltered('sold_desc', '', 30) as $row) {
+        if ($row['id'] === (int) $hot['id']) {
+            $soldBefore = $row['sold'];
+        }
+    }
+    $db->insert('order_items', [
+        'order_id' => (int) Order::findByCode('DASH-HIGH')['id'],
+        'product_id' => (int) $hot['id'],
+        'product_name' => $hot['name'],
+        'price' => 990000,
+        'quantity' => 40,
+        'total' => 39600000,
+    ]);
+
+    $bySold = $stats->productsFiltered('sold_desc', '', 30);
+    T::eq((int) $hot['id'], $bySold[0]['id']);
+    T::eq($soldBefore + 40, $bySold[0]['sold']);
+
+    $outIds = array_column($stats->productsFiltered('stock_asc', 'out', 30), 'id');
+    T::true(in_array((int) $cold['id'], $outIds, true));
+    T::false(in_array((int) $hot['id'], $outIds, true));
+
+    $lowStock = $stats->productsFiltered('sold_desc', 'low', 30);
+    foreach ($lowStock as $row) {
+        T::true($row['stock'] <= 5);
+    }
+
+    $auth = $app->get(App\Services\Auth::class);
+    T::true($auth->attempt('admin@example.com', 'admin123'));
+    $html = $app->handle(Request::create('GET', '/admin', [
+        'order_status' => 'completed',
+        'staff_sort' => 'revenue_desc',
+        'product_sort' => 'sold_desc',
+        'stock' => 'low',
+    ]))->content();
+    T::true(str_contains($html, 'Nhân viên theo doanh số'));
+    T::true(str_contains($html, 'DASH-HIGH'));
+    T::true(str_contains($html, 'Nhân viên Cao'));
+    T::false(str_contains($html, 'DASH-LOW'));
+    $auth->logout();
+});
+
+T::test('Danh mục xoá mềm: vào thùng rác, khách không thấy, khôi phục và xoá vĩnh viễn', function () use ($app) {
+    $id = Category::create([
+        'name' => 'Danh mục thùng rác',
+        'slug' => 'danh-muc-thung-rac',
+        'sort_order' => 99,
+    ]);
+    T::eq(1, Category::deleteById($id));
+    T::eq(null, Category::find($id));
+    T::false(in_array('danh-muc-thung-rac', array_column(Category::ordered(), 'slug'), true));
+    T::false(in_array('danh-muc-thung-rac', array_column(Category::withProductCount(), 'slug'), true));
+    $trashed = Category::onlyTrashed()->find($id);
+    T::eq('danh-muc-thung-rac--xoa-' . $id, $trashed['slug']);
+
+    T::eq(404, $app->handle(Request::create('GET', '/category/danh-muc-thung-rac'))->status());
+    T::false(str_contains($app->handle(Request::create('GET', '/'))->content(), 'Danh mục thùng rác'));
+
+    $other = Category::create([
+        'name' => 'Danh mục thùng rác',
+        'slug' => 'danh-muc-thung-rac',
+        'sort_order' => 1,
+    ]);
+    T::true($other > 0);
+
+    $auth = $app->get(App\Services\Auth::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $auth->login($admin);
+    $token = $app->get(Csrf::class)->token();
+    $trash = $app->handle(Request::create('GET', '/admin/categories/trash'));
+    T::eq(200, $trash->status());
+    T::true(str_contains($trash->content(), 'Danh mục thùng rác'));
+
+    $app->handle(Request::create('POST', '/admin/categories/' . $id . '/restore', ['_token' => $token]));
+    $restored = Category::find($id);
+    T::eq('danh-muc-thung-rac-2', $restored['slug']);
+
+    $app->handle(Request::create('POST', '/admin/categories/' . $other . '/force', ['_token' => $token, '_method' => 'DELETE']));
+    T::true(Category::withTrashed()->find($other) !== null, 'đang dùng thì không nằm trong thùng rác để xoá vĩnh viễn');
+
+    Category::deleteById($other);
+    $app->handle(Request::create('POST', '/admin/categories/' . $other . '/force', ['_token' => $token, '_method' => 'DELETE']));
+    T::eq(null, Category::withTrashed()->find($other));
+    $auth->logout();
 });
 
 T::section('Voucher');
