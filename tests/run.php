@@ -993,16 +993,40 @@ T::test('Danh mục xoá mềm: vào thùng rác, khách không thấy, khôi ph
 });
 
 // ---------------------------------------------------------------- Trạng thái đơn hàng
+/** Đưa đơn đi lần lượt qua các trạng thái (dùng trong test quy trình đơn hàng). */
+function walk_order(OrderService $orders, int $id, array $steps, ?int $by = null): void
+{
+    foreach ($steps as $status) {
+        $orders->updateStatus($id, $status, $by);
+    }
+}
+
 T::section('Order status');
  
-T::test('Order::TRANSITIONS: chỉ cho đi tiếp đúng quy trình; trạng thái cuối không đi đâu nữa', function () {
+T::test('Order::TRANSITIONS: đủ 8 trạng thái, chỉ đi tiếp đúng quy trình; trạng thái cuối không đi đâu nữa', function () {
+    T::eq(
+        ['pending', 'confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered', 'completed', 'cancelled'],
+        array_keys(Order::STATUSES),
+    );
     T::eq(['confirmed', 'cancelled'], Order::nextStatuses('pending'));
-    T::true(Order::canTransition('shipping', 'completed'));
+    T::eq(['packing', 'cancelled'], Order::nextStatuses('confirmed'));
+    T::eq(['awaiting_pickup', 'cancelled'], Order::nextStatuses('packing'));
+    T::eq(['shipping'], Order::nextStatuses('awaiting_pickup'), 'đã giao cho đơn vị vận chuyển thì chưa được huỷ');
+    T::eq(['delivered'], Order::nextStatuses('shipping'));
+    T::eq(['completed'], Order::nextStatuses('delivered'));
+    T::true(Order::canTransition('delivered', 'completed'));
     T::false(Order::canTransition('pending', 'completed'), 'không được nhảy cóc');
-    T::false(Order::canTransition('completed', 'cancelled'), 'đã giao xong thì không huỷ được');
+    T::false(Order::canTransition('shipping', 'completed'), 'phải qua "Đã giao"');
+    T::false(Order::canTransition('completed', 'cancelled'), 'hoàn thành rồi thì không huỷ được');
+    T::false(Order::canTransition('delivered', 'cancelled', 3), 'đã giao thì không huỷ, dù trước đó có thất bại');
     T::eq([], Order::nextStatuses('completed'));
     T::eq([], Order::nextStatuses('cancelled'));
     T::eq([], Order::nextStatuses('khong-co'));
+    // Đang vận chuyển: chỉ huỷ được sau khi lấy/giao hàng thất bại đủ 3 lần
+    T::false(Order::canTransition('awaiting_pickup', 'cancelled', 2));
+    T::true(Order::canTransition('awaiting_pickup', 'cancelled', 3));
+    T::false(Order::canTransition('shipping', 'cancelled', 0));
+    T::eq(['delivered', 'cancelled'], Order::nextStatuses('shipping', 3));
     foreach (array_keys(Order::STATUSES) as $from) {
         foreach (Order::nextStatuses($from) as $to) {
             T::true(isset(Order::STATUSES[$to]), "{$from} -> {$to} phải là trạng thái có thật");
@@ -1022,12 +1046,14 @@ T::test('Trạng thái đơn: đặt hàng ghi lịch sử đầu tiên; đi đ�
  
     $admin = App\Models\User::findBy('email', 'admin@example.com');
     $orders->updateStatus($id, 'confirmed', (int) $admin['id'], 'Đã gọi xác nhận');
-    $orders->updateStatus($id, 'shipping', (int) $admin['id']);
-    $orders->updateStatus($id, 'completed', (int) $admin['id']);
+    walk_order($orders, $id, ['packing', 'awaiting_pickup', 'shipping', 'delivered', 'completed'], (int) $admin['id']);
  
     T::eq('completed', Order::find($id)['status']);
     $history = Order::statusHistory($id);
-    T::eq(['pending', 'confirmed', 'shipping', 'completed'], array_column($history, 'to_status'));
+    T::eq(
+        ['pending', 'confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered', 'completed'],
+        array_column($history, 'to_status'),
+    );
     T::eq('Đã gọi xác nhận', $history[1]['note']);
     T::eq((int) $admin['id'], (int) $history[1]['changed_by']);
 });
@@ -1043,9 +1069,7 @@ T::test('Trạng thái đơn: chặn chuyển sai quy trình, không ghi lịch 
     T::eq('pending', Order::find($id)['status']);
     T::eq(1, count(Order::statusHistory($id)), 'chuyển sai thì không ghi thêm lịch sử');
  
-    $orders->updateStatus($id, 'confirmed');
-    $orders->updateStatus($id, 'shipping');
-    $orders->updateStatus($id, 'completed');
+    walk_order($orders, $id, ['confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered', 'completed']);
     T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'pending'), 'Không thể chuyển');
     T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'cancelled'), 'Không thể chuyển');
     T::eq('completed', Order::find($id)['status']);
@@ -1168,18 +1192,19 @@ T::test('Thanh toán + cập nhật đơn cùng 1 transaction: lỗi giữa ch�
     }
 });
  
-T::test('COD: giao thành công (completed) thì ghi nhận đã thu tiền; huỷ thì vẫn chưa thanh toán', function () use ($app, $customer) {
+T::test('COD: giao thành công (Đã giao) thì ghi nhận đã thu tiền; huỷ thì vẫn chưa thanh toán', function () use ($app, $customer) {
     $orders = $app->get(OrderService::class);
     $p = make_product('Tủ giày thử COD', 350000, 10);
  
     $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
-    $orders->updateStatus($id, 'confirmed');
-    $orders->updateStatus($id, 'shipping');
+    walk_order($orders, $id, ['confirmed', 'packing', 'awaiting_pickup', 'shipping']);
     T::eq('unpaid', Order::find($id)['payment_status'], 'đang giao chưa thu tiền');
-    $orders->updateStatus($id, 'completed');
+    $orders->updateStatus($id, 'delivered');
     $done = Order::find($id);
-    T::eq('paid', $done['payment_status'], 'giao xong => đã thu tiền mặt');
+    T::eq('paid', $done['payment_status'], 'giao thành công => đã thu tiền mặt');
     T::true($done['paid_at'] !== null);
+    $orders->updateStatus($id, 'completed');
+    T::eq($done['paid_at'], Order::find($id)['paid_at'], 'hoàn thành không ghi đè thời điểm thu tiền');
  
     $cancelled = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
     $orders->updateStatus($cancelled, 'cancelled');
@@ -1277,6 +1302,177 @@ T::test('Admin: nút "Đã hoàn tiền" chỉ hiện với đơn cần hoàn ti
     }
 });
 
+T::test('Quy trình mới: đi đủ 8 bước ghi lịch sử từng bước; chỉ huỷ được ở 3 trạng thái đầu', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $p = make_product('Tủ quần áo thử quy trình mới', 800000, 20);
+    $stock = fn (): int => (int) Product::find((int) $p['id'])['stock'];
+    $place = fn (): int => (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+
+    $id = $place();
+    walk_order($orders, $id, ['confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered', 'completed'], (int) $admin['id']);
+    T::eq(
+        ['pending', 'confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered', 'completed'],
+        array_column(Order::statusHistory($id), 'to_status'),
+    );
+
+    // Huỷ được ở Chờ xác nhận, Đã xác nhận, Đang đóng gói: có hoàn kho
+    foreach ([[], ['confirmed'], ['confirmed', 'packing']] as $steps) {
+        $before = $stock();
+        $oid = $place();
+        T::eq($before - 1, $stock());
+        walk_order($orders, $oid, $steps);
+        $orders->updateStatus($oid, 'cancelled', (int) $admin['id'], 'Khách đổi ý');
+        T::eq('cancelled', Order::find($oid)['status']);
+        T::eq($before, $stock(), 'huỷ => hoàn kho');
+    }
+
+    // Đã giao cho đơn vị vận chuyển (chưa thất bại lần nào): chưa được huỷ
+    foreach ([['confirmed', 'packing', 'awaiting_pickup'], ['confirmed', 'packing', 'awaiting_pickup', 'shipping']] as $steps) {
+        $oid = $place();
+        walk_order($orders, $oid, $steps);
+        T::throws(DomainException::class, fn () => $orders->updateStatus($oid, 'cancelled'), 'vận chuyển');
+        T::eq(end($steps), Order::find($oid)['status']);
+    }
+    // Đã giao: không huỷ được
+    $oid = $place();
+    walk_order($orders, $oid, ['confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered']);
+    T::throws(DomainException::class, fn () => $orders->updateStatus($oid, 'cancelled'), 'Không thể chuyển');
+});
+
+T::test('Lấy/giao hàng thất bại lần 1, 2, 3: ghi lịch sử, giữ trạng thái; đủ 3 lần mới được huỷ và hoàn kho', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $by = (int) $admin['id'];
+    $p = make_product('Bàn làm việc thử giao thất bại', 900000, 10);
+    $stock = fn (): int => (int) Product::find((int) $p['id'])['stock'];
+    $place = fn (): int => (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+
+    // Chỉ ghi nhận được khi đang chờ lấy hàng / đang giao
+    $early = $place();
+    T::throws(DomainException::class, fn () => $orders->recordDeliveryFailure($early), 'chờ lấy hàng');
+
+    // Lấy hàng thất bại
+    $id = $place();
+    walk_order($orders, $id, ['confirmed', 'packing', 'awaiting_pickup']);
+    T::eq(1, $orders->recordDeliveryFailure($id, $by, 'Shop chưa chuẩn bị xong'));
+    T::eq(2, $orders->recordDeliveryFailure($id, $by));
+    T::eq('awaiting_pickup', Order::find($id)['status'], 'thất bại thì trạng thái giữ nguyên');
+    T::eq(2, Order::failedAttempts($id, 'awaiting_pickup'));
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'cancelled'), 'hiện có 2 lần');
+
+    $failures = array_values(array_filter(
+        Order::statusHistory($id),
+        fn (array $h): bool => $h['from_status'] === 'awaiting_pickup' && $h['to_status'] === 'awaiting_pickup',
+    ));
+    T::eq(2, count($failures));
+    T::eq('Lấy hàng thất bại lần 1/3: Shop chưa chuẩn bị xong', $failures[0]['note']);
+    T::eq('Lấy hàng thất bại lần 2/3', $failures[1]['note']);
+    T::eq($by, (int) $failures[0]['changed_by']);
+
+    T::eq(3, $orders->recordDeliveryFailure($id, $by));
+    T::throws(DomainException::class, fn () => $orders->recordDeliveryFailure($id), 'đủ 3 lần');
+    T::eq(3, Order::failedAttempts($id, 'awaiting_pickup'), 'không ghi lần thứ 4');
+
+    $before = $stock();
+    $orders->updateStatus($id, 'cancelled', $by, 'Thất bại 3 lần');
+    T::eq('cancelled', Order::find($id)['status']);
+    T::eq($before + 1, $stock(), 'đủ 3 lần => huỷ được và hoàn kho');
+    T::eq('unpaid', Order::find($id)['payment_status'], 'COD chưa thu tiền => không cần hoàn');
+
+    // Lấy hàng thất bại rồi lấy được: sang giao hàng, bộ đếm giao hàng tính lại từ 0
+    $id2 = $place();
+    walk_order($orders, $id2, ['confirmed', 'packing', 'awaiting_pickup']);
+    $orders->recordDeliveryFailure($id2, $by);
+    $orders->updateStatus($id2, 'shipping', $by);
+    T::eq(0, Order::failedAttempts($id2, 'shipping'));
+    T::eq(1, $orders->recordDeliveryFailure($id2, $by, 'Khách không nghe máy'));
+    $last = array_slice(Order::statusHistory($id2), -1)[0];
+    T::eq('Giao hàng thất bại lần 1/3: Khách không nghe máy', $last['note']);
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id2, 'cancelled'), 'hiện có 1 lần');
+    $orders->updateStatus($id2, 'delivered', $by);
+    T::eq('delivered', Order::find($id2)['status'], 'thất bại rồi vẫn giao được');
+});
+
+T::test('Tự hoàn thành: đơn "Đã giao" quá 7 ngày mà khách chưa xác nhận thì tự chuyển Hoàn thành', function () use ($app, $db, $customer) {
+    $orders = $app->get(OrderService::class);
+    $p = make_product('Giường ngủ thử tự hoàn thành', 1200000, 20);
+    $deliver = function (array $steps) use ($orders, $customer, $p): int {
+        $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+        walk_order($orders, $id, $steps);
+        return $id;
+    };
+    $toDelivered = ['confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered'];
+    $backdate = fn (int $id, int $daysAgo) => $db->update(
+        'order_status_histories',
+        ['created_at' => date('Y-m-d H:i:s', time() - $daysAgo * 86400)],
+        'order_id = ? AND to_status = ?',
+        [$id, 'delivered'],
+    );
+
+    $old = $deliver($toDelivered);
+    $recent = $deliver($toDelivered);
+    $shipping = $deliver(['confirmed', 'packing', 'awaiting_pickup', 'shipping']);
+    $confirmedByCustomer = $deliver($toDelivered);
+    $backdate($old, 8);
+    $backdate($recent, 6);
+    $backdate($confirmedByCustomer, 10);
+    $orders->updateStatus($confirmedByCustomer, 'completed', null, 'Khách xác nhận đã nhận hàng');
+
+    T::eq(1, $orders->autoCompleteDelivered());
+    T::eq('completed', Order::find($old)['status']);
+    T::eq('delivered', Order::find($recent)['status'], 'mới 6 ngày thì chưa tự hoàn thành');
+    T::eq('shipping', Order::find($shipping)['status'], 'chưa giao thì không đụng tới');
+    $last = array_slice(Order::statusHistory($old), -1)[0];
+    T::eq('completed', $last['to_status']);
+    T::eq(null, $last['changed_by'], 'hệ thống tự đổi');
+    T::true(str_contains((string) $last['note'], '7 ngày'));
+    T::eq('Khách xác nhận đã nhận hàng', array_slice(Order::statusHistory($confirmedByCustomer), -1)[0]['note'], 'đơn khách đã xác nhận thì không bị ghi đè');
+
+    T::eq(0, $orders->autoCompleteDelivered(), 'chạy lại không xử lý lại');
+    T::eq(1, $orders->autoCompleteDelivered(7, time() + 2 * 86400), 'thêm 2 ngày nữa thì đơn 6 ngày tuổi cũng đủ 7 ngày');
+    T::eq('completed', Order::find($recent)['status']);
+});
+
+T::test('Admin: nút ghi nhận thất bại hiện khi chờ lấy/đang giao; đủ 3 lần thì ẩn nút và cho chọn huỷ', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $p = make_product('Tủ đầu giường thử nút thất bại', 500000, 10);
+        $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+        $page = fn (): string => $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        $failUrl = '/admin/orders/' . $id . '/delivery-failed';
+
+        // Chưa tới bước vận chuyển: không có nút, gọi thẳng cũng bị chặn
+        T::false(str_contains($page(), $failUrl));
+        $app->handle(Request::create('POST', $failUrl, ['_token' => $token]));
+        T::eq(0, Order::failedAttempts($id, 'pending'));
+        T::eq(1, count(Order::statusHistory($id)), 'bị chặn thì không ghi lịch sử');
+
+        walk_order($orders, $id, ['confirmed', 'packing', 'awaiting_pickup']);
+        $html = $page();
+        T::true(str_contains($html, $failUrl), 'chờ lấy hàng => hiện nút ghi nhận thất bại');
+        T::false(str_contains($html, 'value="cancelled"'), 'chưa thất bại đủ 3 lần thì chưa có lựa chọn huỷ');
+
+        for ($i = 1; $i <= 3; $i++) {
+            $res = $app->handle(Request::create('POST', $failUrl, ['_token' => $token, 'note' => 'Lần ' . $i]));
+            T::eq(302, $res->status());
+            T::eq($i, Order::failedAttempts($id, 'awaiting_pickup'));
+        }
+        $html = $page();
+        T::false(str_contains($html, $failUrl), 'đủ 3 lần thì ẩn nút ghi nhận');
+        T::true(str_contains($html, 'value="cancelled"'), 'đủ 3 lần => cho chọn huỷ');
+
+        $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'cancelled']));
+        T::eq('cancelled', Order::find($id)['status']);
+        $last = array_slice(Order::statusHistory($id), -1)[0];
+        T::eq((int) $admin['id'], (int) $last['changed_by'], 'ghi đúng admin bấm huỷ');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
+});
 
 exit(T::run());
 

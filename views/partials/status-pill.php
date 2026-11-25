@@ -9,9 +9,9 @@ $label = match ($type) {
     default => Order::statusLabel($status),
 };
 $tone = match ($status) {
-    'paid', 'completed', 'success' => 'success',
+    'paid', 'completed', 'delivered', 'success' => 'success',
     'failed', 'cancelled' => 'danger',
-    'confirmed', 'shipping' => 'info',
+    'confirmed', 'packing', 'awaiting_pickup', 'shipping' => 'info',
     default => 'warning',
 };
 ?>
