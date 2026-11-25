@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Admin;
 
 use App\Core\Controller;
+use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use App\Models\Category;
@@ -17,6 +18,7 @@ final class CategoryController extends Controller
         return $this->view('admin/categories/index', [
             'categories' => Category::withProductCount(),
             'editing' => $editId > 0 ? Category::find($editId) : null,
+            'trashCount' => Category::onlyTrashed()->count(),
         ]);
     }
 
@@ -36,12 +38,50 @@ final class CategoryController extends Controller
         return $this->redirect('/admin/categories');
     }
 
+    /** Xoá mềm: danh mục biến khỏi web khách và vào thùng rác. Sản phẩm vẫn giữ liên kết. */
     public function destroy(int $id): Response
     {
-        Category::findOrFail($id);
-        Category::deleteById($id); // products.category_id => NULL
-        $this->flash('success', 'Đã xoá danh mục.');
+        $category = Category::findOrFail($id);
+        Category::deleteById($id);
+        $this->flash('success', 'Đã chuyển "' . $category['name'] . '" vào thùng rác. Có thể khôi phục trong mục Thùng rác.');
         return $this->redirect('/admin/categories');
+    }
+
+    public function trash(Request $request): Response
+    {
+        return $this->view('admin/categories/trash', [
+            'pager' => Category::onlyTrashed()->orderBy('deleted_at', 'DESC')
+                ->paginate(15, max(1, (int) $request->query('page', 1))),
+        ]);
+    }
+
+    public function restore(int $id): Response
+    {
+        $category = Category::onlyTrashed()->find($id) ?? throw new HttpException(404);
+        Category::restore($id);
+        $restored = Category::findOrFail($id);
+        $note = $restored['slug'] !== self::originalSlug($category)
+            ? ' Slug cũ đã có danh mục khác dùng, hệ thống đã đặt slug mới.'
+            : '';
+        $this->flash('success', 'Đã khôi phục "' . $restored['name'] . '".' . $note);
+        return $this->redirect('/admin/categories/trash');
+    }
+
+    /** Xoá hẳn. Sản phẩm thuộc danh mục này chuyển về không danh mục (khoá ngoại SET NULL). */
+    public function forceDestroy(int $id): Response
+    {
+        $category = Category::onlyTrashed()->find($id) ?? throw new HttpException(404);
+        Category::forceDeleteById($id);
+        $this->flash('success', 'Đã xoá vĩnh viễn "' . $category['name'] . '".');
+        return $this->redirect('/admin/categories/trash');
+    }
+
+    /** @param array<string, mixed> $category */
+    private static function originalSlug(array $category): string
+    {
+        $suffix = '--xoa-' . (int) $category['id'];
+        $slug = (string) $category['slug'];
+        return str_ends_with($slug, $suffix) ? substr($slug, 0, -strlen($suffix)) : $slug;
     }
 
     /** @return array<string, mixed> */

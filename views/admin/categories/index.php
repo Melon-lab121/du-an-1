@@ -4,6 +4,10 @@ $isEdit = $editing !== null;
 ?>
 <div class="cart-layout">
     <div class="card">
+        <div class="toolbar">
+            <span class="muted">Xoá danh mục sẽ chuyển vào thùng rác, không xoá hẳn.</span>
+            <a class="btn btn-ghost" href="<?= url('/admin/categories/trash') ?>">🗑 Thùng rác (<?= (int) $trashCount ?>)</a>
+        </div>
         <?php if (!$categories): ?>
             <div class="empty">Chưa có danh mục.</div>
         <?php else: ?>
@@ -20,7 +24,7 @@ $isEdit = $editing !== null;
                             <a class="btn btn-sm btn-ghost" href="<?= url('/admin/categories', ['edit' => (int) $c['id']]) ?>">Sửa</a>
                             <form action="<?= url('/admin/categories/' . (int) $c['id']) ?>" method="post">
                                 <?= csrf_field() ?><?= method_field('DELETE') ?>
-                                <button class="btn btn-sm btn-danger" type="submit" data-confirm="Xoá danh mục? Sản phẩm sẽ chuyển về 'không danh mục'.">Xoá</button>
+                                <button class="btn btn-sm btn-danger" type="submit" data-confirm="Chuyển danh mục này vào thùng rác? Khách sẽ không thấy danh mục nữa.">Xoá</button>
                             </form>
                         </td>
                     </tr>
