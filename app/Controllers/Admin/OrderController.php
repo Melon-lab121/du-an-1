@@ -49,12 +49,14 @@ final class OrderController extends Controller
     public function show(int $id): Response
     {
         $order = Order::findOrFail($id);
+        $failedAttempts = Order::failedAttempts($id, (string) $order['status']);
         return $this->view('admin/orders/show', [
             'order' => $order,
             'items' => Order::items($id),
             'payments' => Order::payments($id),
             'history' => Order::statusHistory($id),
-            'nextStatuses' => Order::nextStatuses((string) $order['status']),
+            'nextStatuses' => Order::nextStatuses((string) $order['status'], $failedAttempts),
+            'failedAttempts' => $failedAttempts,
         ]);
     }
 
@@ -70,6 +72,24 @@ final class OrderController extends Controller
             );
             $this->flash('success', 'Đã cập nhật trạng thái đơn.');
         } catch (DomainException | InvalidArgumentException $e) {
+            $this->flash('error', $e->getMessage());
+        }
+        return $this->redirect('/admin/orders/' . $id);
+    }
+
+    /** Admin ghi nhận 1 lần lấy/giao hàng thất bại (trạng thái đơn giữ nguyên). */
+    public function deliveryFailed(Request $request, int $id): Response
+    {
+        Order::findOrFail($id);
+        $reason = trim((string) $request->input('note', ''));
+        try {
+            $attempt = $this->orders->recordDeliveryFailure(
+                $id,
+                $this->auth->id(),
+                $reason === '' ? null : mb_substr($reason, 0, 200),
+            );
+            $this->flash('success', sprintf('Đã ghi nhận thất bại lần %d/%d.', $attempt, Order::MAX_DELIVERY_ATTEMPTS));
+        } catch (DomainException $e) {
             $this->flash('error', $e->getMessage());
         }
         return $this->redirect('/admin/orders/' . $id);

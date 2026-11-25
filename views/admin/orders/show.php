@@ -3,6 +3,7 @@ use App\Models\Order;
 
 $history = $history ?? [];
 $nextStatuses = $nextStatuses ?? [];
+$failedAttempts = $failedAttempts ?? 0;
 
 $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' => 'Đơn hàng ' . $order['code']]);
 ?>
@@ -119,10 +120,24 @@ $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' 
                     </select>
                     <input type="text" name="note" maxlength="255" placeholder="Ghi chú (không bắt buộc)">
                     <button class="btn btn-block" type="submit" data-confirm="Cập nhật trạng thái đơn hàng?">Lưu</button>
-                    <small class="muted">Huỷ đơn sẽ tự hoàn lại tồn kho. Đơn đã thanh toán mà huỷ sẽ chuyển sang "Cần hoàn tiền".</small>
+                    <small class="muted">Chỉ huỷ được khi đơn ở Chờ xác nhận, Đã xác nhận, Đang đóng gói (hoặc sau <?= Order::MAX_DELIVERY_ATTEMPTS ?> lần lấy/giao hàng thất bại). Huỷ đơn sẽ tự hoàn lại tồn kho; đơn đã thanh toán mà huỷ sẽ chuyển sang "Cần hoàn tiền".</small>
                 </form>
             <?php endif ?>
         </div>
+        <?php if (in_array($order['status'], Order::DELIVERY_STAGES, true)): ?>
+            <?php $isPickup = $order['status'] === 'awaiting_pickup'; ?>
+            <div class="card section-sm">
+                <h3><?= $isPickup ? 'Lấy hàng thất bại' : 'Giao hàng thất bại' ?></h3>
+                <p class="muted">Đã ghi nhận <?= (int) $failedAttempts ?>/<?= Order::MAX_DELIVERY_ATTEMPTS ?> lần. Thất bại đủ <?= Order::MAX_DELIVERY_ATTEMPTS ?> lần mới được huỷ đơn.</p>
+                <?php if ($failedAttempts < Order::MAX_DELIVERY_ATTEMPTS): ?>
+                    <form action="<?= url('/admin/orders/' . (int) $order['id'] . '/delivery-failed') ?>" method="post" class="stack">
+                        <?= csrf_field() ?>
+                        <input type="text" name="note" maxlength="200" placeholder="Lý do (không bắt buộc)">
+                        <button class="btn btn-ghost btn-block" type="submit" data-confirm="Ghi nhận <?= $isPickup ? 'lấy hàng' : 'giao hàng' ?> thất bại lần <?= (int) $failedAttempts + 1 ?>?">Ghi nhận thất bại lần <?= (int) $failedAttempts + 1 ?></button>
+                    </form>
+                <?php endif ?>
+            </div>
+        <?php endif ?>
         <div class="card section-sm">
             <h3>Khách hàng</h3>
             <p><strong><?= e($order['customer_name']) ?></strong><br><?= e($order['customer_phone']) ?><br><?= e($order['customer_email']) ?><br><?= e($order['shipping_address']) ?></p>

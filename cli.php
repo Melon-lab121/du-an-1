@@ -9,11 +9,13 @@ declare(strict_types=1);
  *   C:\xampp\php\php.exe cli.php seed         Thêm dữ liệu mẫu
  *   C:\xampp\php\php.exe cli.php fresh        XOÁ toàn bộ bảng rồi install lại (dev)
  *   C:\xampp\php\php.exe cli.php routes       Liệt kê route
+ *   C:\xampp\php\php.exe cli.php orders:autocomplete   Tự hoàn thành đơn "Đã giao" quá 7 ngày (đặt lịch chạy mỗi ngày)
  *   C:\xampp\php\php.exe cli.php serve [port] Chạy server PHP tích hợp (không cần Apache)
  *   C:\xampp\php\php.exe cli.php make:module Blog   Tạo khung module mới
  */
 
 use App\Core\Database;
+use App\Services\OrderService;
 use Database\Migrator;
 use Database\Seeder;
 
@@ -90,6 +92,12 @@ try {
             }
             break;
 
+        case 'orders:autocomplete':
+            $app->boot();
+            $count = $app->get(OrderService::class)->autoCompleteDelivered();
+            $out("Đã tự động hoàn thành {$count} đơn (đơn \"Đã giao\" quá 7 ngày).");
+            break;
+
         case 'serve':
             $port = (int) ($argv[2] ?? 8000);
             $out("Server chạy tại http://localhost:{$port}  (Ctrl+C để dừng)");
@@ -141,7 +149,7 @@ PHP);
             break;
 
         default:
-            $out('Lệnh: install | migrate | seed | fresh --force | routes | serve [port] | make:module Ten');
+            $out('Lệnh: install | migrate | seed | fresh --force | routes | orders:autocomplete | serve [port] | make:module Ten');
     }
 } catch (Throwable $e) {
     fwrite(STDERR, 'Lỗi: ' . $e->getMessage() . PHP_EOL);

@@ -11,7 +11,10 @@ final class Order extends Model
     public const STATUSES = [
         'pending' => 'Chờ xác nhận',
         'confirmed' => 'Đã xác nhận',
+        'packing' => 'Đang đóng gói',
+        'awaiting_pickup' => 'Chờ đơn vị vận chuyển lấy',
         'shipping' => 'Đang giao',
+        'delivered' => 'Đã giao',
         'completed' => 'Hoàn thành',
         'cancelled' => 'Đã huỷ',
     ];
@@ -24,14 +27,26 @@ final class Order extends Model
         'refunded' => 'Đã hoàn tiền',
     ];
 
-    /** Các trạng thái được phép chuyển tới từ mỗi trạng thái. completed/cancelled là trạng thái cuối. */
+    /**
+     * Các trạng thái được phép chuyển tới từ mỗi trạng thái. completed/cancelled là trạng thái cuối.
+     * Chỉ huỷ được ở 3 trạng thái đầu. Khi đơn đã sang đơn vị vận chuyển (DELIVERY_STAGES) thì chỉ huỷ được
+     * sau khi lấy/giao hàng thất bại đủ MAX_DELIVERY_ATTEMPTS lần (xem nextStatuses).
+     */
     public const TRANSITIONS = [
         'pending' => ['confirmed', 'cancelled'],
-        'confirmed' => ['shipping', 'cancelled'],
-        'shipping' => ['completed', 'cancelled'],
+        'confirmed' => ['packing', 'cancelled'],
+        'packing' => ['awaiting_pickup', 'cancelled'],
+        'awaiting_pickup' => ['shipping'],
+        'shipping' => ['delivered'],
+        'delivered' => ['completed'],
         'completed' => [],
         'cancelled' => [],
     ];
+
+    /** Trạng thái mà việc lấy hàng / giao hàng có thể thất bại (mỗi lần thất bại là 1 dòng lịch sử, trạng thái giữ nguyên). */
+    public const DELIVERY_STAGES = ['awaiting_pickup', 'shipping'];
+
+    public const MAX_DELIVERY_ATTEMPTS = 3;
 
     protected static string $table = 'orders';
     protected static array $fillable = [
@@ -80,14 +95,36 @@ final class Order extends Model
         return self::PAYMENT_STATUSES[$status] ?? $status;
     }
 
-    /** @return array<int, string> các trạng thái được phép chuyển tới từ $status */
-    public static function nextStatuses(string $status): array
+    /**
+     * Số lần lấy/giao hàng thất bại đã ghi nhận khi đơn đang ở $status
+     * (dòng lịch sử có from_status = to_status = $status). Trạng thái khác DELIVERY_STAGES luôn trả 0.
+     */
+    public static function failedAttempts(int $orderId, string $status): int
     {
-        return self::TRANSITIONS[$status] ?? [];
+        if (!in_array($status, self::DELIVERY_STAGES, true)) {
+            return 0;
+        }
+        return (int) self::db()->scalar(
+            'SELECT COUNT(*) FROM order_status_histories WHERE order_id = ? AND from_status = ? AND to_status = ?',
+            [$orderId, $status, $status],
+        );
     }
 
-    public static function canTransition(string $from, string $to): bool
+    /**
+     * @param int $failedAttempts số lần thất bại đã ghi nhận ở trạng thái hiện tại (xem failedAttempts)
+     * @return array<int, string> các trạng thái được phép chuyển tới từ $status
+     */
+    public static function nextStatuses(string $status, int $failedAttempts = 0): array
     {
-        return in_array($to, self::nextStatuses($from), true);
+        $next = self::TRANSITIONS[$status] ?? [];
+        if (in_array($status, self::DELIVERY_STAGES, true) && $failedAttempts >= self::MAX_DELIVERY_ATTEMPTS) {
+            $next[] = 'cancelled';
+        }
+        return $next;
+    }
+
+    public static function canTransition(string $from, string $to, int $failedAttempts = 0): bool
+    {
+        return in_array($to, self::nextStatuses($from, $failedAttempts), true);
     }
 }
