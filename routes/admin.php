@@ -6,6 +6,7 @@ use App\Controllers\Admin\CategoryController;
 use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\OrderController;
 use App\Controllers\Admin\ProductController;
+use App\Controllers\Admin\VoucherController;
 use App\Core\Router;
 
 return function (Router $router): void {
@@ -38,5 +39,14 @@ return function (Router $router): void {
         $r->get('/orders/{id:\d+}', [OrderController::class, 'show'])->name('orders.show');
         $r->post('/orders/{id:\d+}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
         $r->post('/orders/{id:\d+}/payments/{paymentId:\d+}/reconcile', [OrderController::class, 'reconcile'])->name('orders.reconcile');
+
+        // Quản lý Voucher
+        $r->get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
+        $r->get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
+        $r->post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
+        $r->get('/vouchers/{id:\d+}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
+        $r->put('/vouchers/{id:\d+}', [VoucherController::class, 'update'])->name('vouchers.update');
+        $r->post('/vouchers/{id:\d+}/toggle', [VoucherController::class, 'toggle'])->name('vouchers.toggle');
+        $r->delete('/vouchers/{id:\d+}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
     });
 };

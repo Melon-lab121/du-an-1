@@ -73,6 +73,33 @@ $field = static fn (string $name, string $fallback = ''): string => e(old($name,
                     <li><span><?= e($line['name']) ?><?= $line['variant_label'] ? ' (' . e($line['variant_label']) . ')' : '' ?> × <?= $line['quantity'] ?></span><strong><?= money($line['total']) ?></strong></li>
                 <?php endforeach ?>
             </ul>
+
+            <?php
+            $checkoutVoucher = function_exists('voucher') && function_exists('cart')
+                ? voucher()->applied($lines, auth()->id(), $user['email'] ?? null, $user['phone'] ?? null)
+                : null;
+            ?>
+            <div class="voucher-checkout-box" style="margin: 14px 0; padding: 12px; background: var(--bg); border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--text);">
+                <?php if ($checkoutVoucher): ?>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                        <div>
+                            <div style="font-weight: 600; color: var(--brand); display: flex; align-items: center; gap: 6px;">
+                                <span>🏷</span>
+                                <span><?= e($checkoutVoucher['voucher']['code']) ?></span>
+                            </div>
+                            <small class="muted" style="display: block; margin-top: 2px; font-size: 12px;"><?= e($checkoutVoucher['description']) ?></small>
+                        </div>
+                        <button type="submit" formaction="<?= url('/voucher/remove') ?>" formmethod="post" class="btn btn-sm btn-ghost" style="color: var(--danger); border-color: var(--danger);">Gỡ mã</button>
+                    </div>
+                <?php else: ?>
+                    <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text);">Mã ưu đãi / Voucher</label>
+                    <div style="display: flex; gap: 6px;">
+                        <input type="text" name="voucher_code_input" placeholder="Nhập mã ưu đãi..." style="flex: 1; text-transform: uppercase; padding: 6px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text);">
+                        <button type="submit" formaction="<?= url('/voucher/apply') ?>" formmethod="post" class="btn btn-sm btn-primary" style="white-space: nowrap;">Áp dụng</button>
+                    </div>
+                <?php endif ?>
+            </div>
+
             <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
             <button class="btn btn-lg btn-block" type="submit">Đặt hàng</button>
             <p class="muted small">Bằng việc đặt hàng, bạn đồng ý với điều khoản mua hàng của chúng tôi.</p>

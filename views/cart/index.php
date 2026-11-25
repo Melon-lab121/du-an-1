@@ -54,6 +54,7 @@
 
             <aside class="card">
                 <h3>Tóm tắt đơn hàng</h3>
+                <?= $this->insert('partials/voucher-box') ?>
                 <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
                 <a class="btn btn-lg btn-block" href="<?= url('/checkout') ?>">Tiến hành đặt hàng</a>
             </aside>

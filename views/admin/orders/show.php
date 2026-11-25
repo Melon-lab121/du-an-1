@@ -84,6 +84,7 @@ $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' 
             <?= $this->insert('partials/order-summary', ['totals' => [
                 'subtotal' => (int) $order['subtotal'], 'discount' => (int) $order['discount'],
                 'shipping_fee' => (int) $order['shipping_fee'], 'total' => (int) $order['total'],
+                'voucher_code' => $order['voucher_code'] ?? null,
             ]]) ?>
         </div>
     </aside>

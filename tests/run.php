@@ -160,6 +160,9 @@ T::test('Request tách base path cho XAMPP thư mục con và php -S', function 
 });
 
 T::test('Request::ip chỉ tin CF-Connecting-IP khi bật TRUST_PROXY và request từ loopback', function () {
+    $origEnv = $_ENV['TRUST_PROXY'] ?? null;
+    putenv('TRUST_PROXY=false');
+    $_ENV['TRUST_PROXY'] = 'false';
     $behindTunnel = ['REMOTE_ADDR' => '127.0.0.1', 'HTTP_CF_CONNECTING_IP' => '203.0.113.7'];
     T::eq('127.0.0.1', Request::create('GET', '/', [], $behindTunnel)->ip(), 'mặc định không tin header');
 
@@ -171,8 +174,13 @@ T::test('Request::ip chỉ tin CF-Connecting-IP khi bật TRUST_PROXY và reques
         T::eq('198.51.100.9', Request::create('GET', '/', [], $spoof)->ip(), 'client ngoài không giả mạo được IP');
         T::eq('127.0.0.1', Request::create('GET', '/', [], ['REMOTE_ADDR' => '127.0.0.1', 'HTTP_CF_CONNECTING_IP' => 'abc'])->ip());
     } finally {
-        putenv('TRUST_PROXY=false');
-        $_ENV['TRUST_PROXY'] = 'false';
+        if ($origEnv !== null) {
+            putenv('TRUST_PROXY=' . $origEnv);
+            $_ENV['TRUST_PROXY'] = $origEnv;
+        } else {
+            putenv('TRUST_PROXY');
+            unset($_ENV['TRUST_PROXY']);
+        }
     }
 });
 
