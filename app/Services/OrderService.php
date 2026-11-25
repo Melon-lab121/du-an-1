@@ -218,7 +218,15 @@ final class OrderService
             if ($from === 'cancelled') {
                 throw new DomainException('Đơn đã huỷ, không thể đổi trạng thái.');
             }
-            if (!Order::canTransition($from, $status)) {
+            $attempts = Order::failedAttempts($orderId, $from);
+            if (!Order::canTransition($from, $status, $attempts)) {
+                if ($status === 'cancelled' && in_array($from, Order::DELIVERY_STAGES, true)) {
+                    throw new DomainException(sprintf(
+                        'Đơn đang vận chuyển chỉ được huỷ sau khi lấy/giao hàng thất bại đủ %d lần (hiện có %d lần).',
+                        Order::MAX_DELIVERY_ATTEMPTS,
+                        $attempts,
+                    ));
+                }
                 throw new DomainException(sprintf(
                     'Không thể chuyển đơn từ "%s" sang "%s".',
                     Order::statusLabel($from),
@@ -230,8 +238,8 @@ final class OrderService
             if ($status === 'cancelled' && $order['payment_status'] === 'paid') {
                 $changes['payment_status'] = 'refund_needed';
             }
-            // COD: giao thành công thì coi như đã thu tiền mặt (để doanh thu tính đủ đơn COD)
-            $codCollected = $status === 'completed'
+            // COD: giao thành công ("Đã giao") thì coi như đã thu tiền mặt (để doanh thu tính đủ đơn COD)
+            $codCollected = $status === 'delivered'
                 && $order['payment_method'] === 'cod'
                 && $order['payment_status'] === 'unpaid';
             if ($codCollected) {
@@ -265,6 +273,72 @@ final class OrderService
                 $this->events->dispatch('order.paid', ['order' => Order::find($orderId)]);
             }
         });
+    }
+
+    /**
+     * Ghi nhận 1 lần lấy hàng (đơn ở 'awaiting_pickup') hoặc giao hàng (đơn ở 'shipping') thất bại.
+     * Trạng thái đơn giữ nguyên; mỗi lần là 1 dòng lịch sử (from = to). Thất bại đủ Order::MAX_DELIVERY_ATTEMPTS
+     * lần thì mới được huỷ đơn (xem Order::nextStatuses).
+     *
+     * @param int|null $changedBy id người dùng (admin) thực hiện
+     * @return int số thứ tự lần thất bại vừa ghi (1, 2, 3)
+     */
+    public function recordDeliveryFailure(int $orderId, ?int $changedBy = null, ?string $reason = null): int
+    {
+        return $this->db->transaction(function (Database $db) use ($orderId, $changedBy, $reason): int {
+            $order = $db->table('orders')->find($orderId) ?? throw new DomainException('Không tìm thấy đơn hàng.');
+            $status = (string) $order['status'];
+            if (!in_array($status, Order::DELIVERY_STAGES, true)) {
+                throw new DomainException('Chỉ ghi nhận thất bại khi đơn đang chờ lấy hàng hoặc đang giao.');
+            }
+
+            $attempt = Order::failedAttempts($orderId, $status) + 1;
+            if ($attempt > Order::MAX_DELIVERY_ATTEMPTS) {
+                throw new DomainException(sprintf('Đã ghi nhận đủ %d lần thất bại, hãy huỷ đơn hoặc tiếp tục giao.', Order::MAX_DELIVERY_ATTEMPTS));
+            }
+
+            $note = sprintf('%s thất bại lần %d/%d', $status === 'awaiting_pickup' ? 'Lấy hàng' : 'Giao hàng', $attempt, Order::MAX_DELIVERY_ATTEMPTS);
+            if ($reason !== null && $reason !== '') {
+                $note .= ': ' . $reason;
+            }
+            $this->recordStatus($db, $orderId, $status, $status, $changedBy, mb_substr($note, 0, 255));
+            return $attempt;
+        });
+    }
+
+    /**
+     * Tự hoàn thành các đơn 'delivered' đã quá $days ngày (tính từ lần chuyển sang 'delivered' gần nhất trong lịch sử)
+     * mà khách chưa xác nhận đã nhận hàng. Chạy bằng `php cli.php orders:autocomplete`, đặt lịch chạy mỗi ngày.
+     *
+     * @param int|null $now mốc thời gian (Unix) để so sánh; mặc định là bây giờ (dùng cho test)
+     * @return int số đơn đã được hoàn thành
+     */
+    public function autoCompleteDelivered(int $days = 7, ?int $now = null): int
+    {
+        $cutoff = date('Y-m-d H:i:s', ($now ?? time()) - $days * 86400);
+        $rows = $this->db->select(
+            "SELECT o.id FROM orders o
+             WHERE o.status = 'delivered'
+               AND (SELECT MAX(h.created_at) FROM order_status_histories h WHERE h.order_id = o.id AND h.to_status = 'delivered') <= ?
+             ORDER BY o.id",
+            [$cutoff],
+        );
+
+        $done = 0;
+        foreach ($rows as $row) {
+            try {
+                $this->updateStatus(
+                    (int) $row['id'],
+                    'completed',
+                    null,
+                    sprintf('Tự động hoàn thành sau %d ngày khách không xác nhận đã nhận hàng', $days),
+                );
+                $done++;
+            } catch (DomainException) {
+                // Đơn vừa được người khác đổi trạng thái: bỏ qua, lần chạy sau sẽ xét lại
+            }
+        }
+        return $done;
     }
 
     /**
