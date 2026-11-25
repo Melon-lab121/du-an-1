@@ -46,5 +46,6 @@ $menu = [
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="<?= asset('assets/js/app.js') ?>" defer></script>
+<?= $this->section('scripts') ?>
 </body>
 </html>

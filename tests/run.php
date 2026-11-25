@@ -15,6 +15,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Router;
 use App\Core\Validator;
+use App\Models\Category;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
@@ -24,6 +25,7 @@ use App\Services\OrderService;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\PaymentManager;
 use App\Services\Payment\SepayGateway;
+use App\Services\DashboardStats;
 use App\Services\PriceCalculator;
 use App\Services\VariantService;
 use Database\Migrator;
@@ -835,265 +837,158 @@ T::test('API JSON /api/products', function () use ($app) {
     T::eq(6, count($hoodie['variants']));
 });
 
-T::section('Voucher');
+T::section('Dashboard');
 
-T::test('Voucher: kiểm tra điều kiện kích hoạt, hạn dùng, chi tiêu tối thiểu', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
-
-    // 1. Voucher không tồn tại
-    $res = $voucherService->evaluate('KHONG_TON_TAI', [['product_id' => 1, 'total' => 200000]]);
-    T::false($res['valid']);
-    T::eq('Mã giảm giá không tồn tại.', $res['error']);
-
-    // 2. Tạo voucher tạm khóa
-    $vId = App\Models\Voucher::create([
-        'code' => 'KHOA10',
-        'voucher_type' => 1,
-        'discount_type' => 1,
-        'discount_value' => 10,
-        'min_spending' => 0,
-        'max_usage_per_user' => 1,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 0,
-    ]);
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 200000]]);
-    T::false($res['valid']);
-    T::eq('Mã giảm giá hiện đang tạm khóa.', $res['error']);
-
-    // 3. Voucher hết hạn
-    App\Models\Voucher::updateById($vId, ['is_active' => 1, 'end_date' => '2025-01-01 00:00:00']);
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 200000]]);
-    T::false($res['valid']);
-    T::true(str_contains($res['error'], 'hết hạn'));
-
-    // 4. Chi tiêu tối thiểu
-    App\Models\Voucher::updateById($vId, ['end_date' => '2027-12-31 23:59:59', 'min_spending' => 500000]);
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 300000]]);
-    T::false($res['valid']);
-    T::true(str_contains($res['error'], 'chi tiêu tối thiểu'));
-
-    // 5. Đạt chi tiêu tối thiểu
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 600000]]);
-    T::true($res['valid']);
-    T::eq(60000, $res['discount']); // 10% của 600.000 = 60.000
+T::test('fillDailyBuckets điền ngày thiếu bằng 0', function () {
+    $today = new DateTimeImmutable('2026-11-25');
+    $filled = DashboardStats::fillDailyBuckets(3, ['2026-11-25' => 150000], ['2026-11-24' => 2], $today);
+    T::eq(['23/11', '24/11', '25/11'], $filled['labels']);
+    T::eq([0, 0, 150000], $filled['revenue']);
+    T::eq([0, 2, 0], $filled['orders']);
 });
 
-T::test('Voucher: giảm theo phần trăm và số tiền cố định', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
+T::test('Tổng quan lọc đơn, nhân viên và sản phẩm', function () use ($app, $db) {
+    $stats = new DashboardStats($db);
+    $before = $stats->orderStatusCounts();
 
-    // Phần trăm 15%
-    App\Models\Voucher::create([
-        'code' => 'PERCENT15',
-        'voucher_type' => 1,
-        'discount_type' => 1,
-        'discount_value' => 15,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
+    $now = date('Y-m-d H:i:s');
+    $highId = $db->insert('users', [
+        'name' => 'Nhân viên Cao', 'email' => 'staff-cao@example.com', 'password' => 'x',
+        'role' => 'staff', 'created_at' => $now, 'updated_at' => $now,
     ]);
-    $res = $voucherService->evaluate('PERCENT15', [['product_id' => 1, 'total' => 200000]]);
-    T::true($res['valid']);
-    T::eq(30000, $res['discount']); // 15% của 200.000 = 30.000
-
-    // Cố định 50.000đ
-    App\Models\Voucher::create([
-        'code' => 'FIXED50K',
-        'voucher_type' => 1,
-        'discount_type' => 2,
-        'discount_value' => 50000,
-        'min_spending' => 100000,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
+    $lowId = $db->insert('users', [
+        'name' => 'Nhân viên Thấp', 'email' => 'staff-thap@example.com', 'password' => 'x',
+        'role' => 'staff', 'created_at' => $now, 'updated_at' => $now,
     ]);
-    $res = $voucherService->evaluate('FIXED50K', [['product_id' => 1, 'total' => 200000]]);
-    T::true($res['valid']);
-    T::eq(50000, $res['discount']);
 
-    // Giảm 30% nhưng tối đa 500.000đ trên đơn 10 triệu
-    App\Models\Voucher::create([
-        'code' => 'CAP30PERCENT',
-        'voucher_type' => 1,
-        'discount_type' => 1,
-        'discount_value' => 30,
-        'max_discount_amount' => 500000,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    // Đơn 10.000.000đ: 30% là 3.000.000đ, nhưng trần tối đa là 500.000đ => giảm đúng 500.000đ
-    $resCap = $voucherService->evaluate('CAP30PERCENT', [['product_id' => 1, 'total' => 10000000]]);
-    T::true($resCap['valid']);
-    T::eq(500000, $resCap['discount']);
-
-    // Đơn 1.000.000đ: 30% là 300.000đ (chưa vượt trần 500.000đ) => giảm 300.000đ
-    $resNoCap = $voucherService->evaluate('CAP30PERCENT', [['product_id' => 1, 'total' => 1000000]]);
-    T::true($resNoCap['valid']);
-    T::eq(300000, $resNoCap['discount']);
-});
-
-T::test('Voucher: giảm theo danh mục và theo sản phẩm', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
-    $db = $app->get(App\Core\Database::class);
-
-    // Lấy 2 sản phẩm thuộc danh mục khác nhau
-    $p1 = Product::find(1);
-    $cat1 = (int) $p1['category_id'];
-
-    // Tạo voucher theo danh mục cat1
-    $vCatId = App\Models\Voucher::create([
-        'code' => 'CATONLY',
-        'voucher_type' => App\Models\VoucherType::CATEGORY,
-        'discount_type' => App\Models\DiscountType::PERCENT,
-        'discount_value' => 20,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    App\Models\Voucher::syncCategories($vCatId, [$cat1]);
-
-    // Giỏ hàng có sản phẩm cat1 (giá 100k) và sản phẩm danh mục khác (999) (giá 200k)
-    $lines = [
-        ['product_id' => 1, 'total' => 100000],
-        ['product_id' => 999999, 'total' => 200000],
+    $orderBase = [
+        'customer_name' => 'Khách lọc', 'customer_email' => 'loc@example.com', 'customer_phone' => '0900000001',
+        'shipping_address' => 'Q1', 'subtotal' => 0, 'shipping_fee' => 0, 'discount' => 0,
+        'payment_method' => 'cod',
     ];
-    $res = $voucherService->evaluate('CATONLY', $lines);
-    T::true($res['valid']);
-    // 20% chỉ tính trên sản phẩm của cat1 (100.000đ) => 20.000đ
-    T::eq(20000, $res['discount']);
-
-    // Giỏ hàng chỉ có sản phẩm không thuộc cat1
-    $resNoCat = $voucherService->evaluate('CATONLY', [['product_id' => 999999, 'total' => 200000]]);
-    T::false($resNoCat['valid']);
-    T::true(str_contains($resNoCat['error'], 'danh mục'));
-
-    // Voucher theo sản phẩm
-    $vProdId = App\Models\Voucher::create([
-        'code' => 'PRODONLY',
-        'voucher_type' => App\Models\VoucherType::PRODUCT,
-        'discount_type' => App\Models\DiscountType::FIXED,
-        'discount_value' => 40000,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
+    Order::create($orderBase + [
+        'code' => 'DASH-HIGH', 'user_id' => $highId, 'total' => 500000,
+        'payment_status' => 'paid', 'status' => 'completed',
     ]);
-    App\Models\Voucher::syncProducts($vProdId, [1]);
-
-    $resProd = $voucherService->evaluate('PRODONLY', $lines);
-    T::true($resProd['valid']);
-    T::eq(40000, $resProd['discount']);
-
-    $resNoProd = $voucherService->evaluate('PRODONLY', [['product_id' => 999999, 'total' => 200000]]);
-    T::false($resNoProd['valid']);
-    T::true(str_contains($resNoProd['error'], 'sản phẩm'));
-});
-
-T::test('Voucher: freeship giảm phí vận chuyển', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
-    // Freeship 100%
-    App\Models\Voucher::create([
-        'code' => 'FREESHIP100',
-        'voucher_type' => App\Models\VoucherType::FREESHIP,
-        'discount_type' => App\Models\DiscountType::PERCENT,
-        'discount_value' => 100,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
+    Order::create($orderBase + [
+        'code' => 'DASH-UNPAID', 'user_id' => $highId, 'total' => 900000,
+        'payment_status' => 'unpaid', 'status' => 'pending',
     ]);
-    $res = $voucherService->evaluate('FREESHIP100', [['product_id' => 1, 'total' => 100000]]);
-    T::true($res['valid']);
-    $shippingFee = (int) $app->config()->get('shop.shipping_fee', 30000);
-    T::eq($shippingFee, $res['discount']);
-});
-
-T::test('Voucher: tích hợp giỏ hàng và đặt hàng lưu voucher_code', function () use ($app) {
-    $cart = $app->get(CartService::class);
-    $voucherService = $app->get(App\Services\VoucherService::class);
-    $orderService = $app->get(App\Services\OrderService::class);
-
-    $cart->clear();
-    $voucherService->remove();
-
-    // Thêm sản phẩm áo thun (id: 1, giá 250k) số lượng 2 => subtotal 500k
-    $cart->add(1, 2);
-    $totalsBefore = $cart->totals();
-    T::eq(0, $totalsBefore['discount']);
-
-    // Tạo và áp voucher TESTCHECKOUT: giảm 50k
-    App\Models\Voucher::create([
-        'code' => 'CHECKOUT50',
-        'voucher_type' => 1,
-        'discount_type' => 2,
-        'discount_value' => 50000,
-        'min_spending' => 300000,
-        'max_usage_per_user' => 1,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
+    Order::create($orderBase + [
+        'code' => 'DASH-LOW', 'user_id' => $lowId, 'total' => 100000,
+        'payment_status' => 'paid', 'status' => 'cancelled',
     ]);
 
-    $applyRes = $voucherService->apply('CHECKOUT50', $cart->lines());
-    T::true($applyRes['success']);
-    T::eq(50000, $applyRes['discount']);
+    $counts = $stats->orderStatusCounts();
+    T::eq($before['completed'] + 1, $counts['completed']);
+    T::eq($before['cancelled'] + 1, $counts['cancelled']);
+    T::eq($before['pending'] + 1, $counts['pending']);
+    T::eq(array_sum($counts), $stats->orderCount(''));
+    T::eq($counts['completed'], $stats->orderCount('completed'));
+    T::true(in_array('DASH-HIGH', array_column($stats->ordersByStatus('completed', 20), 'code'), true));
+    T::false(in_array('DASH-LOW', array_column($stats->ordersByStatus('completed', 20), 'code'), true));
 
-    // Totals giỏ hàng tự động trừ discount qua filter cart.discount
-    $totalsAfter = $cart->totals();
-    T::eq(50000, $totalsAfter['discount']);
-    T::eq($totalsBefore['subtotal'] - 50000 + $totalsAfter['shipping_fee'], $totalsAfter['total']);
+    $ranked = $stats->staffByRevenue('revenue_desc');
+    $positions = array_flip(array_column($ranked, 'id'));
+    T::true($positions[$highId] < $positions[$lowId]);
+    $byId = [];
+    foreach ($ranked as $row) {
+        $byId[$row['id']] = $row;
+    }
+    T::eq(500000, $byId[$highId]['revenue']);
+    T::eq(2, $byId[$highId]['order_count']);
+    T::eq(100000, $byId[$lowId]['revenue']);
 
-    // Đặt hàng
-    $order = $orderService->place([
-        'name' => 'Nguyen Van A',
-        'email' => 'nguyenvana@test.com',
-        'phone' => '0912345678',
-        'address' => 'Hanoi',
-    ], $cart->raw(), 'cod');
+    $asc = array_flip(array_column($stats->staffByRevenue('revenue_asc'), 'id'));
+    T::true($asc[$lowId] < $asc[$highId]);
 
-    T::eq('CHECKOUT50', $order['voucher_code']);
-    T::eq(50000, (int) $order['discount']);
+    $hot = product('tai-nghe-bluetooth-anc');
+    $cold = product('chuot-khong-day-silent');
+    Product::updateById((int) $cold['id'], ['stock' => 0]);
+    $soldBefore = 0;
+    foreach ($stats->productsFiltered('sold_desc', '', 30) as $row) {
+        if ($row['id'] === (int) $hot['id']) {
+            $soldBefore = $row['sold'];
+        }
+    }
+    $db->insert('order_items', [
+        'order_id' => (int) Order::findByCode('DASH-HIGH')['id'],
+        'product_id' => (int) $hot['id'],
+        'product_name' => $hot['name'],
+        'price' => 990000,
+        'quantity' => 40,
+        'total' => 39600000,
+    ]);
 
-    // Sau khi đặt hàng thành công, session voucher được dọn sạch
-    T::eq(null, $voucherService->appliedCode());
+    $bySold = $stats->productsFiltered('sold_desc', '', 30);
+    T::eq((int) $hot['id'], $bySold[0]['id']);
+    T::eq($soldBefore + 40, $bySold[0]['sold']);
 
-    // Khách hàng này dùng lại mã CHECKOUT50 sẽ bị chặn vì max_usage_per_user = 1
-    $reapply = $voucherService->apply('CHECKOUT50', $cart->lines(), null, 'nguyenvana@test.com', '0912345678');
-    T::false($reapply['success']);
-    T::true(str_contains($reapply['message'], 'hết giới hạn'));
+    $outIds = array_column($stats->productsFiltered('stock_asc', 'out', 30), 'id');
+    T::true(in_array((int) $cold['id'], $outIds, true));
+    T::false(in_array((int) $hot['id'], $outIds, true));
 
-    $cart->clear();
-});
+    $lowStock = $stats->productsFiltered('sold_desc', 'low', 30);
+    foreach ($lowStock as $row) {
+        T::true($row['stock'] <= 5);
+    }
 
-T::test('Admin: Quản lý voucher (CRUD, toggle, route)', function () use ($app) {
     $auth = $app->get(App\Services\Auth::class);
-    $auth->attempt('admin@example.com', 'admin123');
-    $token = $app->get(App\Core\Csrf::class)->token();
+    T::true($auth->attempt('admin@example.com', 'admin123'));
+    $html = $app->handle(Request::create('GET', '/admin', [
+        'order_status' => 'completed',
+        'staff_sort' => 'revenue_desc',
+        'product_sort' => 'sold_desc',
+        'stock' => 'low',
+    ]))->content();
+    T::true(str_contains($html, 'Nhân viên theo doanh số'));
+    T::true(str_contains($html, 'DASH-HIGH'));
+    T::true(str_contains($html, 'Nhân viên Cao'));
+    T::false(str_contains($html, 'DASH-LOW'));
+    $auth->logout();
+});
 
-    // Xem danh sách voucher và trang tạo mới
-    T::eq(200, $app->handle(Request::create('GET', '/admin/vouchers'))->status());
-    T::eq(200, $app->handle(Request::create('GET', '/admin/vouchers/create'))->status());
+T::test('Danh mục xoá mềm: vào thùng rác, khách không thấy, khôi phục và xoá vĩnh viễn', function () use ($app) {
+    $id = Category::create([
+        'name' => 'Danh mục thùng rác',
+        'slug' => 'danh-muc-thung-rac',
+        'sort_order' => 99,
+    ]);
+    T::eq(1, Category::deleteById($id));
+    T::eq(null, Category::find($id));
+    T::false(in_array('danh-muc-thung-rac', array_column(Category::ordered(), 'slug'), true));
+    T::false(in_array('danh-muc-thung-rac', array_column(Category::withProductCount(), 'slug'), true));
+    $trashed = Category::onlyTrashed()->find($id);
+    T::eq('danh-muc-thung-rac--xoa-' . $id, $trashed['slug']);
 
-    // Toggle kích hoạt
-    $v = App\Models\Voucher::query()->first();
-    T::true($v !== null);
-    $originalActive = (int) $v['is_active'];
+    T::eq(404, $app->handle(Request::create('GET', '/category/danh-muc-thung-rac'))->status());
+    T::false(str_contains($app->handle(Request::create('GET', '/'))->content(), 'Danh mục thùng rác'));
 
-    $toggleRes = $app->handle(Request::create('POST', '/admin/vouchers/' . (int) $v['id'] . '/toggle', ['_token' => $token]));
-    T::eq(302, $toggleRes->status());
-    $vUpdated = App\Models\Voucher::find((int) $v['id']);
-    T::eq(1 - $originalActive, (int) $vUpdated['is_active']);
+    $other = Category::create([
+        'name' => 'Danh mục thùng rác',
+        'slug' => 'danh-muc-thung-rac',
+        'sort_order' => 1,
+    ]);
+    T::true($other > 0);
 
+    $auth = $app->get(App\Services\Auth::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $auth->login($admin);
+    $token = $app->get(Csrf::class)->token();
+    $trash = $app->handle(Request::create('GET', '/admin/categories/trash'));
+    T::eq(200, $trash->status());
+    T::true(str_contains($trash->content(), 'Danh mục thùng rác'));
+
+    $app->handle(Request::create('POST', '/admin/categories/' . $id . '/restore', ['_token' => $token]));
+    $restored = Category::find($id);
+    T::eq('danh-muc-thung-rac-2', $restored['slug']);
+
+    $app->handle(Request::create('POST', '/admin/categories/' . $other . '/force', ['_token' => $token, '_method' => 'DELETE']));
+    T::true(Category::withTrashed()->find($other) !== null, 'đang dùng thì không nằm trong thùng rác để xoá vĩnh viễn');
+
+    Category::deleteById($other);
+    $app->handle(Request::create('POST', '/admin/categories/' . $other . '/force', ['_token' => $token, '_method' => 'DELETE']));
+    T::eq(null, Category::withTrashed()->find($other));
     $auth->logout();
 });
 
