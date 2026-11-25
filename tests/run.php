@@ -1075,6 +1075,56 @@ T::test('Voucher: tích hợp giỏ hàng và đặt hàng lưu voucher_code', f
     $cart->clear();
 });
 
+T::test('Checkout: chọn voucher bằng select option và đặt hàng trực tiếp', function () use ($app) {
+    $cart = $app->get(CartService::class);
+    $voucherService = $app->get(App\Services\VoucherService::class);
+    $token = $app->get(App\Core\Csrf::class)->token();
+
+    $cart->clear();
+    $voucherService->remove();
+    $cart->add(1, 2);
+
+    $available = $voucherService->availableForCart($cart->lines());
+    T::true(count($available) > 0);
+    T::true(in_array('FIXED50K', array_map(fn ($x) => $x['voucher']['code'], $available), true));
+
+    // GET /checkout hiển thị thẻ <select name="voucher_code_input" ...>
+    $getRes = $app->handle(Request::create('GET', '/checkout'));
+    T::eq(200, $getRes->status());
+    T::true(str_contains($getRes->content(), '<select name="voucher_code_input"'));
+    T::true(str_contains($getRes->content(), 'value="FIXED50K"'));
+
+    // AJAX chọn voucher trả về summary_html và applied
+    $ajaxRes = $app->handle(Request::create('POST', '/voucher/apply', [
+        '_token' => $token,
+        'code' => 'FIXED50K',
+    ], ['HTTP_ACCEPT' => 'application/json']));
+    T::eq(200, $ajaxRes->status());
+    $ajaxData = json_decode($ajaxRes->content(), true);
+    T::true($ajaxData['success']);
+    T::eq('FIXED50K', $ajaxData['applied']['code']);
+    T::true(str_contains($ajaxData['summary_html'], 'FIXED50K'));
+
+    // Reset session rồi gửi thẳng voucher_code_input khi bấm Đặt hàng
+    $voucherService->remove();
+    $postRes = $app->handle(Request::create('POST', '/checkout', [
+        '_token' => $token,
+        'name' => 'Tran Select',
+        'email' => 'select@test.com',
+        'phone' => '0988776655',
+        'address' => 'TP HCM',
+        'payment_method' => 'cod',
+        'voucher_code_input' => 'FIXED50K',
+    ]));
+    T::eq(302, $postRes->status());
+    $order = App\Models\Order::query()->where('customer_email', 'select@test.com')->first();
+    T::true($order !== null);
+    T::eq('FIXED50K', $order['voucher_code']);
+    T::eq(50000, (int) $order['discount']);
+
+    $cart->clear();
+});
+
 T::test('Admin: Quản lý voucher (CRUD, toggle, route)', function () use ($app) {
     $auth = $app->get(App\Services\Auth::class);
     $auth->attempt('admin@example.com', 'admin123');
