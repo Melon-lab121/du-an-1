@@ -992,4 +992,291 @@ T::test('Danh mục xoá mềm: vào thùng rác, khách không thấy, khôi ph
     $auth->logout();
 });
 
+// ---------------------------------------------------------------- Trạng thái đơn hàng
+T::section('Order status');
+ 
+T::test('Order::TRANSITIONS: chỉ cho đi tiếp đúng quy trình; trạng thái cuối không đi đâu nữa', function () {
+    T::eq(['confirmed', 'cancelled'], Order::nextStatuses('pending'));
+    T::true(Order::canTransition('shipping', 'completed'));
+    T::false(Order::canTransition('pending', 'completed'), 'không được nhảy cóc');
+    T::false(Order::canTransition('completed', 'cancelled'), 'đã giao xong thì không huỷ được');
+    T::eq([], Order::nextStatuses('completed'));
+    T::eq([], Order::nextStatuses('cancelled'));
+    T::eq([], Order::nextStatuses('khong-co'));
+    foreach (array_keys(Order::STATUSES) as $from) {
+        foreach (Order::nextStatuses($from) as $to) {
+            T::true(isset(Order::STATUSES[$to]), "{$from} -> {$to} phải là trạng thái có thật");
+        }
+    }
+});
+ 
+T::test('Trạng thái đơn: đặt hàng ghi lịch sử đầu tiên; đi đúng quy trình thì ghi từng bước', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $p = make_product('Gối tựa lưng thử trạng thái', 200000, 10);
+    $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+    $history = Order::statusHistory($id);
+    T::eq(1, count($history));
+    T::eq(null, $history[0]['from_status']);
+    T::eq('pending', $history[0]['to_status']);
+ 
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $orders->updateStatus($id, 'confirmed', (int) $admin['id'], 'Đã gọi xác nhận');
+    $orders->updateStatus($id, 'shipping', (int) $admin['id']);
+    $orders->updateStatus($id, 'completed', (int) $admin['id']);
+ 
+    T::eq('completed', Order::find($id)['status']);
+    $history = Order::statusHistory($id);
+    T::eq(['pending', 'confirmed', 'shipping', 'completed'], array_column($history, 'to_status'));
+    T::eq('Đã gọi xác nhận', $history[1]['note']);
+    T::eq((int) $admin['id'], (int) $history[1]['changed_by']);
+});
+ 
+T::test('Trạng thái đơn: chặn chuyển sai quy trình, không ghi lịch sử, không hoàn kho nhầm', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $p = make_product('Kệ sách thử chặn trạng thái', 150000, 10);
+    $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'completed'), 'Không thể chuyển');
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'shipping'), 'Không thể chuyển');
+    T::throws(InvalidArgumentException::class, fn () => $orders->updateStatus($id, 'bay-bay'));
+    T::eq('pending', Order::find($id)['status']);
+    T::eq(1, count(Order::statusHistory($id)), 'chuyển sai thì không ghi thêm lịch sử');
+ 
+    $orders->updateStatus($id, 'confirmed');
+    $orders->updateStatus($id, 'shipping');
+    $orders->updateStatus($id, 'completed');
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'pending'), 'Không thể chuyển');
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'cancelled'), 'Không thể chuyển');
+    T::eq('completed', Order::find($id)['status']);
+    T::eq(9, (int) Product::find((int) $p['id'])['stock'], 'huỷ bị chặn thì kho không bị cộng lại');
+});
+ 
+T::test('Trạng thái đơn: IPN tự xác nhận ghi lịch sử; huỷ đơn đã trả tiền => cần hoàn tiền + hoàn kho', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $p = make_product('Đèn ngủ thử hoàn tiền', 300000, 10);
+    $order = $orders->place($customer, [(int) $p['id'] => 2], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $payment = Order::payments($id)[0];
+ 
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    T::eq('paid', Order::find($id)['payment_status']);
+    T::eq('confirmed', Order::find($id)['status']);
+    T::eq(8, (int) Product::find((int) $p['id'])['stock']);
+ 
+    $history = Order::statusHistory($id);
+    T::eq(['pending', 'confirmed'], array_column($history, 'to_status'));
+    T::eq(null, $history[1]['changed_by'], 'hệ thống tự đổi => changed_by rỗng');
+    T::eq(2, count(Order::statusHistory($id)), 'gửi lại IPN không ghi thêm lịch sử');
+    $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment));
+    T::eq(2, count(Order::statusHistory($id)));
+ 
+    $orders->updateStatus($id, 'cancelled', null, 'Khách đổi ý');
+    $after = Order::find($id);
+    T::eq('cancelled', $after['status']);
+    T::eq('refund_needed', $after['payment_status'], 'đã trả tiền mà huỷ => admin phải hoàn tiền');
+    T::eq(10, (int) Product::find((int) $p['id'])['stock'], 'huỷ => hoàn kho');
+    $last = array_slice(Order::statusHistory($id), -1)[0];
+    T::eq('cancelled', $last['to_status']);
+    T::eq('Khách đổi ý', $last['note']);
+});
+ 
+T::test('Trạng thái đơn: tiền về sau khi đơn đã huỷ => không sống lại, đánh dấu cần hoàn tiền', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $p = make_product('Thảm trải sàn thử huỷ trước', 250000, 10);
+    $order = $orders->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $payment = Order::payments($id)[0];
+ 
+    $orders->updateStatus($id, 'cancelled');
+    T::eq(10, (int) Product::find((int) $p['id'])['stock']);
+ 
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    $after = Order::find($id);
+    T::eq('cancelled', $after['status'], 'đơn đã huỷ không được sống lại');
+    T::eq('refund_needed', $after['payment_status']);
+    T::eq('success', Payment::find((int) $payment['id'])['status'], 'vẫn ghi nhận giao dịch đã thu tiền');
+    T::eq(10, (int) Product::find((int) $p['id'])['stock'], 'không trừ kho lần nữa');
+    $last = array_slice(Order::statusHistory($id), -1)[0];
+    T::true(str_contains((string) $last['note'], 'hoàn tiền'), 'lịch sử ghi rõ cần hoàn tiền');
+ 
+    $count = count(Order::statusHistory($id));
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    T::eq('refund_needed', Order::find($id)['payment_status'], 'gửi lại IPN không đổi gì');
+    T::eq($count, count(Order::statusHistory($id)));
+});
+ 
+T::test('Thanh toán + cập nhật đơn cùng 1 transaction: lỗi giữa chừng thì rollback, IPN gửi lại vẫn xử lý được', function () use ($app, $db, $customer) {
+    $service = $app->get(PaymentService::class);
+    $p = make_product('Bàn học thử transaction', 400000, 10);
+    $order = $app->get(OrderService::class)->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $payment = Order::payments($id)[0];
+ 
+    // Giả lập lỗi khi ghi lịch sử (bảng tạm bị đổi tên) => markPaid ném lỗi giữa chừng
+    $db->pdo()->exec('ALTER TABLE order_status_histories RENAME TO order_status_histories_tmp');
+    try {
+        T::eq(500, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    } finally {
+        $db->pdo()->exec('ALTER TABLE order_status_histories_tmp RENAME TO order_status_histories');
+    }
+ 
+    T::eq('pending', Payment::find((int) $payment['id'])['status'], 'payments phải rollback cùng đơn hàng');
+    T::eq('unpaid', Order::find($id)['payment_status']);
+    T::eq('pending', Order::find($id)['status']);
+ 
+    // SePay gửi lại IPN => lần này xử lý được (trước đây bị kẹt: payments đã success nhưng đơn vẫn chờ)
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    T::eq('success', Payment::find((int) $payment['id'])['status']);
+    T::eq('paid', Order::find($id)['payment_status']);
+    T::eq('confirmed', Order::find($id)['status']);
+});
+ 
+ T::test('Admin: trang đơn chỉ đưa ra trạng thái hợp lệ tiếp theo và hiện lịch sử; chuyển sai bị chặn', function () use ($app, $customer) {
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $p = make_product('Ghế sofa thử trang admin', 500000, 10);
+        $id = (int) $app->get(OrderService::class)->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::true(str_contains($html, 'value="confirmed"'), 'đơn chờ xác nhận => được chọn "Đã xác nhận"');
+        T::false(str_contains($html, 'value="completed"'), 'chưa xác nhận thì không được hoàn thành luôn');
+        T::true(str_contains($html, 'Lịch sử trạng thái'));
+ 
+        $res = $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'completed']));
+        T::eq(302, $res->status());
+        T::eq('pending', Order::find($id)['status'], 'chuyển sai quy trình bị chặn');
+ 
+        $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'confirmed', 'note' => 'Đã gọi khách']));
+        T::eq('confirmed', Order::find($id)['status']);
+        $last = array_slice(Order::statusHistory($id), -1)[0];
+        T::eq('confirmed', $last['to_status']);
+        T::eq('Đã gọi khách', $last['note']);
+ 
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::true(str_contains($html, 'Đã gọi khách'), 'ghi chú hiện trong bảng lịch sử');
+        T::true(str_contains($html, 'Hệ thống'), 'dòng "Khách đặt hàng" do hệ thống ghi');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
+});
+ 
+T::test('COD: giao thành công (completed) thì ghi nhận đã thu tiền; huỷ thì vẫn chưa thanh toán', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $p = make_product('Tủ giày thử COD', 350000, 10);
+ 
+    $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+    $orders->updateStatus($id, 'confirmed');
+    $orders->updateStatus($id, 'shipping');
+    T::eq('unpaid', Order::find($id)['payment_status'], 'đang giao chưa thu tiền');
+    $orders->updateStatus($id, 'completed');
+    $done = Order::find($id);
+    T::eq('paid', $done['payment_status'], 'giao xong => đã thu tiền mặt');
+    T::true($done['paid_at'] !== null);
+ 
+    $cancelled = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+    $orders->updateStatus($cancelled, 'cancelled');
+    T::eq('unpaid', Order::find($cancelled)['payment_status'], 'COD bị huỷ => chưa từng thu tiền, không cần hoàn');
+});
+ 
+T::test('Hoàn tiền: chỉ đơn "cần hoàn tiền" mới đánh dấu được; ghi lịch sử; không làm sống lại đơn', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $p = make_product('Kệ tivi thử hoàn tiền', 600000, 10);
+ 
+    $order = $orders->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+ 
+    T::throws(DomainException::class, fn () => $orders->markRefunded($id), 'Cần hoàn tiền');
+ 
+    $service->start($order);
+    $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn(Order::payments($id)[0]));
+    $orders->updateStatus($id, 'cancelled');
+    T::eq('refund_needed', Order::find($id)['payment_status']);
+ 
+    $orders->markRefunded($id, (int) $admin['id'], 'Đã chuyển khoản lại');
+    $after = Order::find($id);
+    T::eq('refunded', $after['payment_status']);
+    T::eq('cancelled', $after['status'], 'đơn vẫn là đã huỷ');
+    $last = array_slice(Order::statusHistory($id), -1)[0];
+    T::eq('Đã chuyển khoản lại', $last['note']);
+    T::eq((int) $admin['id'], (int) $last['changed_by']);
+ 
+    T::throws(DomainException::class, fn () => $orders->markRefunded($id), 'Cần hoàn tiền');
+    T::eq('refunded', Order::find($id)['payment_status'], 'gọi lại không đổi gì');
+});
+T::test('Admin: đổi trạng thái đơn thì lịch sử ghi đúng admin đã thực hiện', function () use ($app, $customer) {
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $p = make_product('Bàn trang điểm thử ghi tên admin', 450000, 10);
+        $id = (int) $app->get(OrderService::class)->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+        $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'confirmed']));
+        $last = array_slice(Order::statusHistory($id), -1)[0];
+        T::eq('confirmed', $last['to_status']);
+        T::eq((int) $admin['id'], (int) $last['changed_by'], 'ghi id admin đang đăng nhập');
+        T::eq($admin['name'], $last['changed_by_name'], 'lấy được tên admin để hiển thị');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
+});
+
+T::test('Admin: nút "Đã hoàn tiền" chỉ hiện với đơn cần hoàn tiền và bấm được', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $p = make_product('Tủ giày thử nút hoàn tiền', 700000, 10);
+    $order = $orders->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn(Order::payments($id)[0]));
+
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $refundUrl = '/admin/orders/' . $id . '/refunded';
+
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::false(str_contains($html, $refundUrl), 'đơn đã trả tiền bình thường thì chưa có nút hoàn tiền');
+
+        // Bấm khi chưa ở trạng thái "cần hoàn tiền" => bị chặn, không đổi gì
+        $res = $app->handle(Request::create('POST', $refundUrl, ['_token' => $token]));
+        T::eq(302, $res->status());
+        T::eq('paid', Order::find($id)['payment_status'], 'chưa huỷ thì không hoàn tiền được');
+
+        $orders->updateStatus($id, 'cancelled', (int) $admin['id']);
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::true(str_contains($html, $refundUrl), 'đơn cần hoàn tiền => hiện nút');
+
+        $res = $app->handle(Request::create('POST', $refundUrl, ['_token' => $token, 'note' => 'CK lại mã GD 123']));
+        T::eq(302, $res->status());
+        T::eq('refunded', Order::find($id)['payment_status']);
+        $last = array_slice(Order::statusHistory($id), -1)[0];
+        T::eq('CK lại mã GD 123', $last['note']);
+        T::eq((int) $admin['id'], (int) $last['changed_by'], 'ghi đúng admin bấm nút');
+
+        // Bấm lại lần 2: không ghi thêm lịch sử
+        $count = count(Order::statusHistory($id));
+        $app->handle(Request::create('POST', $refundUrl, ['_token' => $token]));
+        T::eq($count, count(Order::statusHistory($id)), 'bấm lại không ghi thêm lịch sử');
+
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::false(str_contains($html, $refundUrl), 'đã hoàn tiền xong thì ẩn nút');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
+});
+
+
 exit(T::run());
+
