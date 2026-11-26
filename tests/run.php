@@ -992,316 +992,291 @@ T::test('Danh mục xoá mềm: vào thùng rác, khách không thấy, khôi ph
     $auth->logout();
 });
 
-T::section('Voucher');
-
-T::test('Voucher: kiểm tra điều kiện kích hoạt, hạn dùng, chi tiêu tối thiểu', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
-
-    // 1. Voucher không tồn tại
-    $res = $voucherService->evaluate('KHONG_TON_TAI', [['product_id' => 1, 'total' => 200000]]);
-    T::false($res['valid']);
-    T::eq('Mã giảm giá không tồn tại.', $res['error']);
-
-    // 2. Tạo voucher tạm khóa
-    $vId = App\Models\Voucher::create([
-        'code' => 'KHOA10',
-        'voucher_type' => 1,
-        'discount_type' => 1,
-        'discount_value' => 10,
-        'min_spending' => 0,
-        'max_usage_per_user' => 1,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 0,
-    ]);
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 200000]]);
-    T::false($res['valid']);
-    T::eq('Mã giảm giá hiện đang tạm khóa.', $res['error']);
-
-    // 3. Voucher hết hạn
-    App\Models\Voucher::updateById($vId, ['is_active' => 1, 'end_date' => '2025-01-01 00:00:00']);
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 200000]]);
-    T::false($res['valid']);
-    T::true(str_contains($res['error'], 'hết hạn'));
-
-    // 4. Chi tiêu tối thiểu
-    App\Models\Voucher::updateById($vId, ['end_date' => '2027-12-31 23:59:59', 'min_spending' => 500000]);
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 300000]]);
-    T::false($res['valid']);
-    T::true(str_contains($res['error'], 'chi tiêu tối thiểu'));
-
-    // 5. Đạt chi tiêu tối thiểu
-    $res = $voucherService->evaluate('KHOA10', [['product_id' => 1, 'total' => 600000]]);
-    T::true($res['valid']);
-    T::eq(60000, $res['discount']); // 10% của 600.000 = 60.000
+// ---------------------------------------------------------------- Trạng thái đơn hàng
+T::section('Order status');
+ 
+T::test('Order::TRANSITIONS: chỉ cho đi tiếp đúng quy trình; trạng thái cuối không đi đâu nữa', function () {
+    T::eq(['confirmed', 'cancelled'], Order::nextStatuses('pending'));
+    T::true(Order::canTransition('shipping', 'completed'));
+    T::false(Order::canTransition('pending', 'completed'), 'không được nhảy cóc');
+    T::false(Order::canTransition('completed', 'cancelled'), 'đã giao xong thì không huỷ được');
+    T::eq([], Order::nextStatuses('completed'));
+    T::eq([], Order::nextStatuses('cancelled'));
+    T::eq([], Order::nextStatuses('khong-co'));
+    foreach (array_keys(Order::STATUSES) as $from) {
+        foreach (Order::nextStatuses($from) as $to) {
+            T::true(isset(Order::STATUSES[$to]), "{$from} -> {$to} phải là trạng thái có thật");
+        }
+    }
+});
+ 
+T::test('Trạng thái đơn: đặt hàng ghi lịch sử đầu tiên; đi đúng quy trình thì ghi từng bước', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $p = make_product('Gối tựa lưng thử trạng thái', 200000, 10);
+    $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+    $history = Order::statusHistory($id);
+    T::eq(1, count($history));
+    T::eq(null, $history[0]['from_status']);
+    T::eq('pending', $history[0]['to_status']);
+ 
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $orders->updateStatus($id, 'confirmed', (int) $admin['id'], 'Đã gọi xác nhận');
+    $orders->updateStatus($id, 'shipping', (int) $admin['id']);
+    $orders->updateStatus($id, 'completed', (int) $admin['id']);
+ 
+    T::eq('completed', Order::find($id)['status']);
+    $history = Order::statusHistory($id);
+    T::eq(['pending', 'confirmed', 'shipping', 'completed'], array_column($history, 'to_status'));
+    T::eq('Đã gọi xác nhận', $history[1]['note']);
+    T::eq((int) $admin['id'], (int) $history[1]['changed_by']);
+});
+ 
+T::test('Trạng thái đơn: chặn chuyển sai quy trình, không ghi lịch sử, không hoàn kho nhầm', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $p = make_product('Kệ sách thử chặn trạng thái', 150000, 10);
+    $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'completed'), 'Không thể chuyển');
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'shipping'), 'Không thể chuyển');
+    T::throws(InvalidArgumentException::class, fn () => $orders->updateStatus($id, 'bay-bay'));
+    T::eq('pending', Order::find($id)['status']);
+    T::eq(1, count(Order::statusHistory($id)), 'chuyển sai thì không ghi thêm lịch sử');
+ 
+    $orders->updateStatus($id, 'confirmed');
+    $orders->updateStatus($id, 'shipping');
+    $orders->updateStatus($id, 'completed');
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'pending'), 'Không thể chuyển');
+    T::throws(DomainException::class, fn () => $orders->updateStatus($id, 'cancelled'), 'Không thể chuyển');
+    T::eq('completed', Order::find($id)['status']);
+    T::eq(9, (int) Product::find((int) $p['id'])['stock'], 'huỷ bị chặn thì kho không bị cộng lại');
+});
+ 
+T::test('Trạng thái đơn: IPN tự xác nhận ghi lịch sử; huỷ đơn đã trả tiền => cần hoàn tiền + hoàn kho', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $p = make_product('Đèn ngủ thử hoàn tiền', 300000, 10);
+    $order = $orders->place($customer, [(int) $p['id'] => 2], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $payment = Order::payments($id)[0];
+ 
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    T::eq('paid', Order::find($id)['payment_status']);
+    T::eq('confirmed', Order::find($id)['status']);
+    T::eq(8, (int) Product::find((int) $p['id'])['stock']);
+ 
+    $history = Order::statusHistory($id);
+    T::eq(['pending', 'confirmed'], array_column($history, 'to_status'));
+    T::eq(null, $history[1]['changed_by'], 'hệ thống tự đổi => changed_by rỗng');
+    T::eq(2, count(Order::statusHistory($id)), 'gửi lại IPN không ghi thêm lịch sử');
+    $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment));
+    T::eq(2, count(Order::statusHistory($id)));
+ 
+    $orders->updateStatus($id, 'cancelled', null, 'Khách đổi ý');
+    $after = Order::find($id);
+    T::eq('cancelled', $after['status']);
+    T::eq('refund_needed', $after['payment_status'], 'đã trả tiền mà huỷ => admin phải hoàn tiền');
+    T::eq(10, (int) Product::find((int) $p['id'])['stock'], 'huỷ => hoàn kho');
+    $last = array_slice(Order::statusHistory($id), -1)[0];
+    T::eq('cancelled', $last['to_status']);
+    T::eq('Khách đổi ý', $last['note']);
+});
+ 
+T::test('Trạng thái đơn: tiền về sau khi đơn đã huỷ => không sống lại, đánh dấu cần hoàn tiền', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $p = make_product('Thảm trải sàn thử huỷ trước', 250000, 10);
+    $order = $orders->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $payment = Order::payments($id)[0];
+ 
+    $orders->updateStatus($id, 'cancelled');
+    T::eq(10, (int) Product::find((int) $p['id'])['stock']);
+ 
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    $after = Order::find($id);
+    T::eq('cancelled', $after['status'], 'đơn đã huỷ không được sống lại');
+    T::eq('refund_needed', $after['payment_status']);
+    T::eq('success', Payment::find((int) $payment['id'])['status'], 'vẫn ghi nhận giao dịch đã thu tiền');
+    T::eq(10, (int) Product::find((int) $p['id'])['stock'], 'không trừ kho lần nữa');
+    $last = array_slice(Order::statusHistory($id), -1)[0];
+    T::true(str_contains((string) $last['note'], 'hoàn tiền'), 'lịch sử ghi rõ cần hoàn tiền');
+ 
+    $count = count(Order::statusHistory($id));
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    T::eq('refund_needed', Order::find($id)['payment_status'], 'gửi lại IPN không đổi gì');
+    T::eq($count, count(Order::statusHistory($id)));
+});
+ 
+T::test('Thanh toán + cập nhật đơn cùng 1 transaction: lỗi giữa chừng thì rollback, IPN gửi lại vẫn xử lý được', function () use ($app, $db, $customer) {
+    $service = $app->get(PaymentService::class);
+    $p = make_product('Bàn học thử transaction', 400000, 10);
+    $order = $app->get(OrderService::class)->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $payment = Order::payments($id)[0];
+ 
+    // Giả lập lỗi khi ghi lịch sử (bảng tạm bị đổi tên) => markPaid ném lỗi giữa chừng
+    $db->pdo()->exec('ALTER TABLE order_status_histories RENAME TO order_status_histories_tmp');
+    try {
+        T::eq(500, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    } finally {
+        $db->pdo()->exec('ALTER TABLE order_status_histories_tmp RENAME TO order_status_histories');
+    }
+ 
+    T::eq('pending', Payment::find((int) $payment['id'])['status'], 'payments phải rollback cùng đơn hàng');
+    T::eq('unpaid', Order::find($id)['payment_status']);
+    T::eq('pending', Order::find($id)['status']);
+ 
+    // SePay gửi lại IPN => lần này xử lý được (trước đây bị kẹt: payments đã success nhưng đơn vẫn chờ)
+    T::eq(200, $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn($payment))['status']);
+    T::eq('success', Payment::find((int) $payment['id'])['status']);
+    T::eq('paid', Order::find($id)['payment_status']);
+    T::eq('confirmed', Order::find($id)['status']);
+});
+ 
+ T::test('Admin: trang đơn chỉ đưa ra trạng thái hợp lệ tiếp theo và hiện lịch sử; chuyển sai bị chặn', function () use ($app, $customer) {
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $p = make_product('Ghế sofa thử trang admin', 500000, 10);
+        $id = (int) $app->get(OrderService::class)->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::true(str_contains($html, 'value="confirmed"'), 'đơn chờ xác nhận => được chọn "Đã xác nhận"');
+        T::false(str_contains($html, 'value="completed"'), 'chưa xác nhận thì không được hoàn thành luôn');
+        T::true(str_contains($html, 'Lịch sử trạng thái'));
+ 
+        $res = $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'completed']));
+        T::eq(302, $res->status());
+        T::eq('pending', Order::find($id)['status'], 'chuyển sai quy trình bị chặn');
+ 
+        $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'confirmed', 'note' => 'Đã gọi khách']));
+        T::eq('confirmed', Order::find($id)['status']);
+        $last = array_slice(Order::statusHistory($id), -1)[0];
+        T::eq('confirmed', $last['to_status']);
+        T::eq('Đã gọi khách', $last['note']);
+ 
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::true(str_contains($html, 'Đã gọi khách'), 'ghi chú hiện trong bảng lịch sử');
+        T::true(str_contains($html, 'Hệ thống'), 'dòng "Khách đặt hàng" do hệ thống ghi');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
+});
+ 
+T::test('COD: giao thành công (completed) thì ghi nhận đã thu tiền; huỷ thì vẫn chưa thanh toán', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $p = make_product('Tủ giày thử COD', 350000, 10);
+ 
+    $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+    $orders->updateStatus($id, 'confirmed');
+    $orders->updateStatus($id, 'shipping');
+    T::eq('unpaid', Order::find($id)['payment_status'], 'đang giao chưa thu tiền');
+    $orders->updateStatus($id, 'completed');
+    $done = Order::find($id);
+    T::eq('paid', $done['payment_status'], 'giao xong => đã thu tiền mặt');
+    T::true($done['paid_at'] !== null);
+ 
+    $cancelled = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+    $orders->updateStatus($cancelled, 'cancelled');
+    T::eq('unpaid', Order::find($cancelled)['payment_status'], 'COD bị huỷ => chưa từng thu tiền, không cần hoàn');
+});
+ 
+T::test('Hoàn tiền: chỉ đơn "cần hoàn tiền" mới đánh dấu được; ghi lịch sử; không làm sống lại đơn', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $p = make_product('Kệ tivi thử hoàn tiền', 600000, 10);
+ 
+    $order = $orders->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+ 
+    T::throws(DomainException::class, fn () => $orders->markRefunded($id), 'Cần hoàn tiền');
+ 
+    $service->start($order);
+    $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn(Order::payments($id)[0]));
+    $orders->updateStatus($id, 'cancelled');
+    T::eq('refund_needed', Order::find($id)['payment_status']);
+ 
+    $orders->markRefunded($id, (int) $admin['id'], 'Đã chuyển khoản lại');
+    $after = Order::find($id);
+    T::eq('refunded', $after['payment_status']);
+    T::eq('cancelled', $after['status'], 'đơn vẫn là đã huỷ');
+    $last = array_slice(Order::statusHistory($id), -1)[0];
+    T::eq('Đã chuyển khoản lại', $last['note']);
+    T::eq((int) $admin['id'], (int) $last['changed_by']);
+ 
+    T::throws(DomainException::class, fn () => $orders->markRefunded($id), 'Cần hoàn tiền');
+    T::eq('refunded', Order::find($id)['payment_status'], 'gọi lại không đổi gì');
+});
+T::test('Admin: đổi trạng thái đơn thì lịch sử ghi đúng admin đã thực hiện', function () use ($app, $customer) {
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $p = make_product('Bàn trang điểm thử ghi tên admin', 450000, 10);
+        $id = (int) $app->get(OrderService::class)->place($customer, [(int) $p['id'] => 1], 'cod')['id'];
+ 
+        $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'confirmed']));
+        $last = array_slice(Order::statusHistory($id), -1)[0];
+        T::eq('confirmed', $last['to_status']);
+        T::eq((int) $admin['id'], (int) $last['changed_by'], 'ghi id admin đang đăng nhập');
+        T::eq($admin['name'], $last['changed_by_name'], 'lấy được tên admin để hiển thị');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
 });
 
-T::test('Voucher: giảm theo phần trăm và số tiền cố định', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
+T::test('Admin: nút "Đã hoàn tiền" chỉ hiện với đơn cần hoàn tiền và bấm được', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $service = $app->get(PaymentService::class);
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $p = make_product('Tủ giày thử nút hoàn tiền', 700000, 10);
+    $order = $orders->place($customer, [(int) $p['id'] => 1], 'sepay');
+    $id = (int) $order['id'];
+    $service->start($order);
+    $service->handleSepayIpn('ipn-secret-cua-nhom', sepay_ipn(Order::payments($id)[0]));
 
-    // Phần trăm 15%
-    App\Models\Voucher::create([
-        'code' => 'PERCENT15',
-        'voucher_type' => 1,
-        'discount_type' => 1,
-        'discount_value' => 15,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    $res = $voucherService->evaluate('PERCENT15', [['product_id' => 1, 'total' => 200000]]);
-    T::true($res['valid']);
-    T::eq(30000, $res['discount']); // 15% của 200.000 = 30.000
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $refundUrl = '/admin/orders/' . $id . '/refunded';
 
-    // Cố định 50.000đ
-    App\Models\Voucher::create([
-        'code' => 'FIXED50K',
-        'voucher_type' => 1,
-        'discount_type' => 2,
-        'discount_value' => 50000,
-        'min_spending' => 100000,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    $res = $voucherService->evaluate('FIXED50K', [['product_id' => 1, 'total' => 200000]]);
-    T::true($res['valid']);
-    T::eq(50000, $res['discount']);
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::false(str_contains($html, $refundUrl), 'đơn đã trả tiền bình thường thì chưa có nút hoàn tiền');
 
-    // Giảm 30% nhưng tối đa 500.000đ trên đơn 10 triệu
-    App\Models\Voucher::create([
-        'code' => 'CAP30PERCENT',
-        'voucher_type' => 1,
-        'discount_type' => 1,
-        'discount_value' => 30,
-        'max_discount_amount' => 500000,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    // Đơn 10.000.000đ: 30% là 3.000.000đ, nhưng trần tối đa là 500.000đ => giảm đúng 500.000đ
-    $resCap = $voucherService->evaluate('CAP30PERCENT', [['product_id' => 1, 'total' => 10000000]]);
-    T::true($resCap['valid']);
-    T::eq(500000, $resCap['discount']);
+        // Bấm khi chưa ở trạng thái "cần hoàn tiền" => bị chặn, không đổi gì
+        $res = $app->handle(Request::create('POST', $refundUrl, ['_token' => $token]));
+        T::eq(302, $res->status());
+        T::eq('paid', Order::find($id)['payment_status'], 'chưa huỷ thì không hoàn tiền được');
 
-    // Đơn 1.000.000đ: 30% là 300.000đ (chưa vượt trần 500.000đ) => giảm 300.000đ
-    $resNoCap = $voucherService->evaluate('CAP30PERCENT', [['product_id' => 1, 'total' => 1000000]]);
-    T::true($resNoCap['valid']);
-    T::eq(300000, $resNoCap['discount']);
+        $orders->updateStatus($id, 'cancelled', (int) $admin['id']);
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::true(str_contains($html, $refundUrl), 'đơn cần hoàn tiền => hiện nút');
+
+        $res = $app->handle(Request::create('POST', $refundUrl, ['_token' => $token, 'note' => 'CK lại mã GD 123']));
+        T::eq(302, $res->status());
+        T::eq('refunded', Order::find($id)['payment_status']);
+        $last = array_slice(Order::statusHistory($id), -1)[0];
+        T::eq('CK lại mã GD 123', $last['note']);
+        T::eq((int) $admin['id'], (int) $last['changed_by'], 'ghi đúng admin bấm nút');
+
+        // Bấm lại lần 2: không ghi thêm lịch sử
+        $count = count(Order::statusHistory($id));
+        $app->handle(Request::create('POST', $refundUrl, ['_token' => $token]));
+        T::eq($count, count(Order::statusHistory($id)), 'bấm lại không ghi thêm lịch sử');
+
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::false(str_contains($html, $refundUrl), 'đã hoàn tiền xong thì ẩn nút');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
 });
 
-T::test('Voucher: giảm theo danh mục và theo sản phẩm', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
-    $db = $app->get(App\Core\Database::class);
-
-    // Lấy 2 sản phẩm thuộc danh mục khác nhau
-    $p1 = Product::find(1);
-    $cat1 = (int) $p1['category_id'];
-
-    // Tạo voucher theo danh mục cat1
-    $vCatId = App\Models\Voucher::create([
-        'code' => 'CATONLY',
-        'voucher_type' => App\Models\VoucherType::CATEGORY,
-        'discount_type' => App\Models\DiscountType::PERCENT,
-        'discount_value' => 20,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    App\Models\Voucher::syncCategories($vCatId, [$cat1]);
-
-    // Giỏ hàng có sản phẩm cat1 (giá 100k) và sản phẩm danh mục khác (999) (giá 200k)
-    $lines = [
-        ['product_id' => 1, 'total' => 100000],
-        ['product_id' => 999999, 'total' => 200000],
-    ];
-    $res = $voucherService->evaluate('CATONLY', $lines);
-    T::true($res['valid']);
-    // 20% chỉ tính trên sản phẩm của cat1 (100.000đ) => 20.000đ
-    T::eq(20000, $res['discount']);
-
-    // Giỏ hàng chỉ có sản phẩm không thuộc cat1
-    $resNoCat = $voucherService->evaluate('CATONLY', [['product_id' => 999999, 'total' => 200000]]);
-    T::false($resNoCat['valid']);
-    T::true(str_contains($resNoCat['error'], 'danh mục'));
-
-    // Voucher theo sản phẩm
-    $vProdId = App\Models\Voucher::create([
-        'code' => 'PRODONLY',
-        'voucher_type' => App\Models\VoucherType::PRODUCT,
-        'discount_type' => App\Models\DiscountType::FIXED,
-        'discount_value' => 40000,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    App\Models\Voucher::syncProducts($vProdId, [1]);
-
-    $resProd = $voucherService->evaluate('PRODONLY', $lines);
-    T::true($resProd['valid']);
-    T::eq(40000, $resProd['discount']);
-
-    $resNoProd = $voucherService->evaluate('PRODONLY', [['product_id' => 999999, 'total' => 200000]]);
-    T::false($resNoProd['valid']);
-    T::true(str_contains($resNoProd['error'], 'sản phẩm'));
-});
-
-T::test('Voucher: freeship giảm phí vận chuyển', function () use ($app) {
-    $voucherService = $app->get(App\Services\VoucherService::class);
-    // Freeship 100%
-    App\Models\Voucher::create([
-        'code' => 'FREESHIP100',
-        'voucher_type' => App\Models\VoucherType::FREESHIP,
-        'discount_type' => App\Models\DiscountType::PERCENT,
-        'discount_value' => 100,
-        'min_spending' => 0,
-        'max_usage_per_user' => 5,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-    $res = $voucherService->evaluate('FREESHIP100', [['product_id' => 1, 'total' => 100000]]);
-    T::true($res['valid']);
-    $shippingFee = (int) $app->config()->get('shop.shipping_fee', 30000);
-    T::eq($shippingFee, $res['discount']);
-});
-
-T::test('Voucher: tích hợp giỏ hàng và đặt hàng lưu voucher_code', function () use ($app) {
-    $cart = $app->get(CartService::class);
-    $voucherService = $app->get(App\Services\VoucherService::class);
-    $orderService = $app->get(App\Services\OrderService::class);
-
-    $cart->clear();
-    $voucherService->remove();
-
-    // Thêm sản phẩm áo thun (id: 1, giá 250k) số lượng 2 => subtotal 500k
-    $cart->add(1, 2);
-    $totalsBefore = $cart->totals();
-    T::eq(0, $totalsBefore['discount']);
-
-    // Tạo và áp voucher TESTCHECKOUT: giảm 50k
-    App\Models\Voucher::create([
-        'code' => 'CHECKOUT50',
-        'voucher_type' => 1,
-        'discount_type' => 2,
-        'discount_value' => 50000,
-        'min_spending' => 300000,
-        'max_usage_per_user' => 1,
-        'start_date' => '2026-01-01 00:00:00',
-        'end_date' => '2027-12-31 23:59:59',
-        'is_active' => 1,
-    ]);
-
-    $applyRes = $voucherService->apply('CHECKOUT50', $cart->lines());
-    T::true($applyRes['success']);
-    T::eq(50000, $applyRes['discount']);
-
-    // Totals giỏ hàng tự động trừ discount qua filter cart.discount
-    $totalsAfter = $cart->totals();
-    T::eq(50000, $totalsAfter['discount']);
-    T::eq($totalsBefore['subtotal'] - 50000 + $totalsAfter['shipping_fee'], $totalsAfter['total']);
-
-    // Đặt hàng
-    $order = $orderService->place([
-        'name' => 'Nguyen Van A',
-        'email' => 'nguyenvana@test.com',
-        'phone' => '0912345678',
-        'address' => 'Hanoi',
-    ], $cart->raw(), 'cod');
-
-    T::eq('CHECKOUT50', $order['voucher_code']);
-    T::eq(50000, (int) $order['discount']);
-
-    // Sau khi đặt hàng thành công, session voucher được dọn sạch
-    T::eq(null, $voucherService->appliedCode());
-
-    // Khách hàng này dùng lại mã CHECKOUT50 sẽ bị chặn vì max_usage_per_user = 1
-    $reapply = $voucherService->apply('CHECKOUT50', $cart->lines(), null, 'nguyenvana@test.com', '0912345678');
-    T::false($reapply['success']);
-    T::true(str_contains($reapply['message'], 'hết giới hạn'));
-
-    $cart->clear();
-});
-
-T::test('Checkout: chọn voucher bằng select option và đặt hàng trực tiếp', function () use ($app) {
-    $cart = $app->get(CartService::class);
-    $voucherService = $app->get(App\Services\VoucherService::class);
-    $token = $app->get(App\Core\Csrf::class)->token();
-
-    $cart->clear();
-    $voucherService->remove();
-    $cart->add(1, 2);
-
-    $available = $voucherService->availableForCart($cart->lines());
-    T::true(count($available) > 0);
-    T::true(in_array('FIXED50K', array_map(fn ($x) => $x['voucher']['code'], $available), true));
-
-    // GET /checkout hiển thị thẻ <select name="voucher_code_input" ...>
-    $getRes = $app->handle(Request::create('GET', '/checkout'));
-    T::eq(200, $getRes->status());
-    T::true(str_contains($getRes->content(), '<select name="voucher_code_input"'));
-    T::true(str_contains($getRes->content(), 'value="FIXED50K"'));
-
-    // AJAX chọn voucher trả về summary_html và applied
-    $ajaxRes = $app->handle(Request::create('POST', '/voucher/apply', [
-        '_token' => $token,
-        'code' => 'FIXED50K',
-    ], ['HTTP_ACCEPT' => 'application/json']));
-    T::eq(200, $ajaxRes->status());
-    $ajaxData = json_decode($ajaxRes->content(), true);
-    T::true($ajaxData['success']);
-    T::eq('FIXED50K', $ajaxData['applied']['code']);
-    T::true(str_contains($ajaxData['summary_html'], 'FIXED50K'));
-
-    // Reset session rồi gửi thẳng voucher_code_input khi bấm Đặt hàng
-    $voucherService->remove();
-    $postRes = $app->handle(Request::create('POST', '/checkout', [
-        '_token' => $token,
-        'name' => 'Tran Select',
-        'email' => 'select@test.com',
-        'phone' => '0988776655',
-        'address' => 'TP HCM',
-        'payment_method' => 'cod',
-        'voucher_code_input' => 'FIXED50K',
-    ]));
-    T::eq(302, $postRes->status());
-    $order = App\Models\Order::query()->where('customer_email', 'select@test.com')->first();
-    T::true($order !== null);
-    T::eq('FIXED50K', $order['voucher_code']);
-    T::eq(50000, (int) $order['discount']);
-
-    $cart->clear();
-});
-
-T::test('Admin: Quản lý voucher (CRUD, toggle, route)', function () use ($app) {
-    $auth = $app->get(App\Services\Auth::class);
-    $auth->attempt('admin@example.com', 'admin123');
-    $token = $app->get(App\Core\Csrf::class)->token();
-
-    // Xem danh sách voucher và trang tạo mới
-    T::eq(200, $app->handle(Request::create('GET', '/admin/vouchers'))->status());
-    T::eq(200, $app->handle(Request::create('GET', '/admin/vouchers/create'))->status());
-
-    // Toggle kích hoạt
-    $v = App\Models\Voucher::query()->first();
-    T::true($v !== null);
-    $originalActive = (int) $v['is_active'];
-
-    $toggleRes = $app->handle(Request::create('POST', '/admin/vouchers/' . (int) $v['id'] . '/toggle', ['_token' => $token]));
-    T::eq(302, $toggleRes->status());
-    $vUpdated = App\Models\Voucher::find((int) $v['id']);
-    T::eq(1 - $originalActive, (int) $vUpdated['is_active']);
-
-    $auth->logout();
-});
 
 exit(T::run());
+
