@@ -36,6 +36,7 @@ $navCategories ??= [];
                     <div class="dropdown-menu">
                         <?php if (auth()->isAdmin()): ?><a href="<?= url('/admin') ?>">Trang quản trị</a><?php endif ?>
                         <a href="<?= url('/orders') ?>">Đơn hàng của tôi</a>
+                        <a href="<?= url('/account') ?>">Thông tin tài khoản</a>
                         <form action="<?= url('/logout') ?>" method="post">
                             <?= csrf_field() ?>
                             <button type="submit" class="link">Đăng xuất</button>

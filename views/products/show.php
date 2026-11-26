@@ -35,19 +35,38 @@ $shortDescription = $isLongDescription ? mb_substr($fullDescription, 0, 360) . '
 
 $comments = $comments ?? [];
 $avgRating = $avgRating ?? 0.0;
-$isLoggedIn = isset($isLoggedIn)
-    ? (bool) $isLoggedIn
-    : (!empty($_SESSION['user_id']) || (!empty($_SESSION['user']['id'])));
+if (!isset($isLoggedIn)) {
+    $isLoggedIn = false;
+    if (function_exists('auth') && auth() !== null && method_exists(auth(), 'check')) {
+        $isLoggedIn = (bool) auth()->check();
+    }
+    if (!$isLoggedIn) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $isLoggedIn = !empty($_SESSION['user_id'])
+            || (!empty($_SESSION['auth_user']) && !empty($_SESSION['auth_user']['id']))
+            || (!empty($_SESSION['user']) && !empty($_SESSION['user']['id']));
+    }
+} else {
+    $isLoggedIn = (bool) $isLoggedIn;
+}
+$canReview = isset($canReview) ? (bool) $canReview : $isLoggedIn;
 ?>
 <section class="container section">
     <div class="page-nav-bar">
         <button type="button" class="btn-back-action" onclick="if (history.length > 1) { history.back(); } else { location.href = '<?= $category ? route('category.show', ['slug' => $category['slug']]) : url('/products') ?>'; }" title="Quay lại trang trước">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m15 18-6-6 6-6" />
+            </svg>
             <span>Quay lại</span>
         </button>
         <nav class="breadcrumb">
             <a href="<?= url('/') ?>" class="breadcrumb-link">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
                 <span>Trang chủ</span>
             </a>
             <span class="breadcrumb-sep">/</span>
@@ -74,8 +93,7 @@ $isLoggedIn = isset($isLoggedIn)
                             data-thumb-src="<?= e($mainDefaultSrc) ?>"
                             data-variant-values=""
                             title="<?= e((string) $product['name']) ?>"
-                            style="width: 56px; height: 56px; padding: 2px; border: 1.5px solid var(--brand, #5c4d42); border-radius: 8px; background: transparent; cursor: pointer; overflow: hidden;"
-                        >
+                            style="width: 56px; height: 56px; padding: 2px; border: 1.5px solid var(--brand, #5c4d42); border-radius: 8px; background: transparent; cursor: pointer; overflow: hidden;">
                             <img src="<?= e($mainDefaultSrc) ?>" alt="<?= e((string) $product['name']) ?>" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px;">
                         </button>
                     <?php endif ?>
@@ -88,8 +106,7 @@ $isLoggedIn = isset($isLoggedIn)
                             data-thumb-src="<?= e($thumb['src']) ?>"
                             data-variant-values="<?= e($valCsv) ?>"
                             title="<?= e($thumb['title']) ?>"
-                            style="width: 56px; height: 56px; padding: 2px; border: <?= ($mainDefaultSrc === '' && $idx === 0) ? '1.5px solid var(--brand, #5c4d42)' : '1px solid var(--border, #ddd)' ?>; border-radius: 8px; background: transparent; cursor: pointer; overflow: hidden;"
-                        >
+                            style="width: 56px; height: 56px; padding: 2px; border: <?= ($mainDefaultSrc === '' && $idx === 0) ? '1.5px solid var(--brand, #5c4d42)' : '1px solid var(--border, #ddd)' ?>; border-radius: 8px; background: transparent; cursor: pointer; overflow: hidden;">
                             <img src="<?= e($thumb['src']) ?>" alt="<?= e($thumb['title']) ?>" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px;">
                         </button>
                     <?php endforeach ?>
@@ -148,8 +165,7 @@ $isLoggedIn = isset($isLoggedIn)
                                         data-thumb-src="<?= e($vSrc) ?>"
                                         data-variant-values="<?= e($vVals) ?>"
                                         <?= !$hasStructuredOptions ? 'data-required-variant="1"' : '' ?>
-                                        style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;"
-                                    >
+                                        style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
                                         <?php if ($vSrc !== ''): ?>
                                             <img src="<?= e($vSrc) ?>" alt="<?= e($vTitle) ?>" style="width:20px;height:20px;object-fit:cover;border-radius:4px;">
                                         <?php endif ?>
@@ -160,7 +176,9 @@ $isLoggedIn = isset($isLoggedIn)
                         </fieldset>
                     <?php endif ?>
 
-                    <script type="application/json" data-variant-json><?= json_encode($variantRows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?></script>
+                    <script type="application/json" data-variant-json>
+                        <?= json_encode($variantRows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>
+                    </script>
                 <?php endif ?>
 
                 <div class="qty" data-qty>
@@ -169,11 +187,17 @@ $isLoggedIn = isset($isLoggedIn)
                     <button type="button" data-step="1" aria-label="Tăng">+</button>
                 </div>
                 <button class="btn btn-lg btn-outline btn-detail-cart" type="submit" <?= $inStock ? '' : 'disabled' ?>>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 6px;"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 6px;">
+                        <circle cx="9" cy="21" r="1" />
+                        <circle cx="20" cy="21" r="1" />
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                    </svg>
                     <span>Thêm vào giỏ</span>
                 </button>
                 <button class="btn btn-lg btn-primary btn-detail-buy" type="submit" name="buy_now" value="1" <?= $inStock ? '' : 'disabled' ?>>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 6px;"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 6px;">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
                     <span>Thanh toán ngay</span>
                 </button>
             </form>
@@ -206,6 +230,7 @@ $isLoggedIn = isset($isLoggedIn)
     <?php endif ?>
 
     <div class="card section" id="product-comments">
+
         <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
             <h2 style="margin:0;">Đánh giá &amp; bình luận (<?= count($comments) ?>)</h2>
             <?php if ($comments !== []): ?>
@@ -213,7 +238,11 @@ $isLoggedIn = isset($isLoggedIn)
             <?php endif ?>
         </div>
 
-        <?php if ($isLoggedIn): ?>
+        <?php if (!$isLoggedIn): ?>
+            <p class="muted">Vui lòng <a href="<?= url('/login') ?>">đăng nhập</a> để gửi đánh giá và bình luận cho sản phẩm này.</p>
+        <?php elseif (!$canReview): ?>
+            <p class="muted">Bạn chỉ có thể đánh giá và bình luận sau khi đơn hàng chứa sản phẩm này chuyển sang trạng thái <strong>Hoàn thành</strong>.</p>
+        <?php else: ?>
             <form action="<?= url('/product/' . urlencode((string) $product['slug']) . '/comments') ?>" method="post" class="stack" style="margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border, #e5e7eb);">
                 <?= csrf_field() ?>
                 <label class="field">
@@ -234,10 +263,6 @@ $isLoggedIn = isset($isLoggedIn)
                     <button type="submit" class="btn">Gửi đánh giá &amp; bình luận</button>
                 </div>
             </form>
-        <?php else: ?>
-            <p class="muted" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border, #e5e7eb);">
-                Vui lòng <a href="<?= route('login') ?>">đăng nhập</a> để gửi đánh giá và bình luận cho sản phẩm này.
-            </p>
         <?php endif ?>
 
         <?php if ($comments === []): ?>
@@ -263,7 +288,9 @@ $isLoggedIn = isset($isLoggedIn)
 
     <?php if ($related): ?>
         <div class="section">
-            <div class="section-head"><h2>Sản phẩm liên quan</h2></div>
+            <div class="section-head">
+                <h2>Sản phẩm liên quan</h2>
+            </div>
             <div class="product-grid">
                 <?php foreach ($related as $item): ?>
                     <?= $this->insert('partials/product-card', ['product' => $item]) ?>
@@ -275,169 +302,169 @@ $isLoggedIn = isset($isLoggedIn)
 
 <?php $this->start('scripts') ?>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const toggleDescBtn = document.getElementById('toggle-description-btn');
-    const descPreview = document.getElementById('description-preview');
-    const descFull = document.getElementById('description-full');
-    if (toggleDescBtn && descPreview && descFull) {
-        toggleDescBtn.addEventListener('click', function () {
-            const expanded = toggleDescBtn.getAttribute('aria-expanded') === 'true';
-            toggleDescBtn.setAttribute('aria-expanded', String(!expanded));
-            descPreview.style.display = expanded ? '' : 'none';
-            descFull.style.display = expanded ? 'none' : '';
-            toggleDescBtn.textContent = expanded ? 'Xem thêm' : 'Thu gọn';
-        });
-    }
-
-    <?php if ($hasVariants): ?>
-    const form = document.querySelector('form[data-variant-picker]');
-    const mainBox = document.querySelector('[data-main-image-box]');
-    const thumbs = Array.from(document.querySelectorAll('.variant-thumb-btn'));
-    const pills = Array.from(document.querySelectorAll('.js-variant-pill'));
-    const variantIdInput = document.querySelector('[data-selected-variant-id]');
-    const skuEl = document.querySelector('[data-variant-sku]');
-    const priceEl = document.querySelector('[data-variant-price] strong');
-    const stockEl = document.querySelector('[data-variant-stock]');
-    const variantJsonEl = document.querySelector('[data-variant-json]');
-
-    let variantList = [];
-    if (variantJsonEl) {
-        try {
-            variantList = JSON.parse(variantJsonEl.textContent || '[]');
-        } catch (e) {
-            variantList = [];
-        }
-    }
-
-    const formatVnd = (amount) =>
-        new Intl.NumberFormat('vi-VN').format(Math.max(0, Math.round(amount))) + ' ₫';
-
-    function setMainImage(src, altText) {
-        if (!src || !mainBox) return;
-        let mainImg = mainBox.querySelector('img');
-        if (!mainImg) {
-            mainBox.innerHTML = '<img src="" alt="" loading="lazy">';
-            mainImg = mainBox.querySelector('img');
-        }
-        if (mainImg) {
-            mainImg.src = src;
-            if (altText) mainImg.alt = altText;
-        }
-    }
-
-    function setActiveThumb(src) {
-        thumbs.forEach((t) => {
-            const isMatch = src && t.getAttribute('data-thumb-src') === src;
-            t.classList.toggle('is-active', isMatch);
-            t.style.borderColor = isMatch ? 'var(--brand, #5c4d42)' : 'var(--border, #ddd)';
-            t.style.borderWidth = isMatch ? '1.5px' : '1px';
-        });
-    }
-
-    function setActivePill(activePill) {
-        pills.forEach((p) => {
-            const isMatch = p === activePill;
-            p.classList.toggle('is-active', isMatch);
-            p.style.borderColor = isMatch ? 'var(--brand, #5c4d42)' : '';
-        });
-    }
-
-    function applyVariant(matched) {
-        if (!matched) return;
-        if (variantIdInput && matched.id) {
-            variantIdInput.value = String(matched.id);
-        }
-        if (skuEl && matched.sku) {
-            skuEl.textContent = matched.sku;
-        }
-        if (priceEl && matched.final !== undefined) {
-            priceEl.textContent = formatVnd(Number(matched.final));
-        }
-        if (stockEl && matched.stock !== undefined) {
-            const qty = Number(matched.stock);
-            stockEl.textContent = qty > 0 ? 'Còn ' + qty + ' sản phẩm' : 'Tạm hết hàng';
-        }
-    }
-
-    function selectByValues(valIds, fallbackSrc, fallbackTitle, pillEl) {
-        const normalized = valIds.map(Number).filter(Boolean).sort();
-        if (normalized.length > 0 && form) {
-            normalized.forEach((vid) => {
-                const radio = form.querySelector('input[type="radio"][value="' + vid + '"]');
-                if (radio) radio.checked = true;
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleDescBtn = document.getElementById('toggle-description-btn');
+        const descPreview = document.getElementById('description-preview');
+        const descFull = document.getElementById('description-full');
+        if (toggleDescBtn && descPreview && descFull) {
+            toggleDescBtn.addEventListener('click', function() {
+                const expanded = toggleDescBtn.getAttribute('aria-expanded') === 'true';
+                toggleDescBtn.setAttribute('aria-expanded', String(!expanded));
+                descPreview.style.display = expanded ? '' : 'none';
+                descFull.style.display = expanded ? 'none' : '';
+                toggleDescBtn.textContent = expanded ? 'Xem thêm' : 'Thu gọn';
             });
         }
 
-        const matched = variantList.find((v) => {
-            const vVals = Array.isArray(v.values) ? v.values.map(Number).sort() : [];
-            return vVals.length === normalized.length && normalized.length > 0 && vVals.every((val, i) => val === normalized[i]);
-        }) || (pillEl ? variantList.find((v) => Number(v.id) === Number(pillEl.getAttribute('data-variant-id'))) : null);
+        <?php if ($hasVariants): ?>
+            const form = document.querySelector('form[data-variant-picker]');
+            const mainBox = document.querySelector('[data-main-image-box]');
+            const thumbs = Array.from(document.querySelectorAll('.variant-thumb-btn'));
+            const pills = Array.from(document.querySelectorAll('.js-variant-pill'));
+            const variantIdInput = document.querySelector('[data-selected-variant-id]');
+            const skuEl = document.querySelector('[data-variant-sku]');
+            const priceEl = document.querySelector('[data-variant-price] strong');
+            const stockEl = document.querySelector('[data-variant-stock]');
+            const variantJsonEl = document.querySelector('[data-variant-json]');
 
-        if (fallbackSrc) {
-            setMainImage(fallbackSrc, fallbackTitle || '');
-            setActiveThumb(fallbackSrc);
-        }
-        if (pillEl) {
-            setActivePill(pillEl);
-        }
-        applyVariant(matched);
-    }
+            let variantList = [];
+            if (variantJsonEl) {
+                try {
+                    variantList = JSON.parse(variantJsonEl.textContent || '[]');
+                } catch (e) {
+                    variantList = [];
+                }
+            }
 
-    thumbs.forEach((btn) => {
-        btn.addEventListener('click', function () {
-            const src = btn.getAttribute('data-thumb-src') || '';
-            const valIds = (btn.getAttribute('data-variant-values') || '').split(',');
-            const matchingPill = pills.find((p) => (p.getAttribute('data-variant-values') || '') === (btn.getAttribute('data-variant-values') || ''));
-            selectByValues(valIds, src, btn.getAttribute('title') || '', matchingPill || null);
-        });
-    });
+            const formatVnd = (amount) =>
+                new Intl.NumberFormat('vi-VN').format(Math.max(0, Math.round(amount))) + ' ₫';
 
-    pills.forEach((pill) => {
-        pill.addEventListener('click', function () {
-            const src = pill.getAttribute('data-thumb-src') || '';
-            const valIds = (pill.getAttribute('data-variant-values') || '').split(',');
-            selectByValues(valIds, src, pill.textContent.trim(), pill);
-        });
-    });
+            function setMainImage(src, altText) {
+                if (!src || !mainBox) return;
+                let mainImg = mainBox.querySelector('img');
+                if (!mainImg) {
+                    mainBox.innerHTML = '<img src="" alt="" loading="lazy">';
+                    mainImg = mainBox.querySelector('img');
+                }
+                if (mainImg) {
+                    mainImg.src = src;
+                    if (altText) mainImg.alt = altText;
+                }
+            }
 
-    if (form) {
-        form.querySelectorAll('input[type="radio"]').forEach((radio) => {
-            radio.addEventListener('change', function () {
-                const checkedIds = Array.from(form.querySelectorAll('input[type="radio"]:checked'))
-                    .map((r) => Number(r.value))
-                    .sort();
-                if (checkedIds.length === 0) return;
+            function setActiveThumb(src) {
+                thumbs.forEach((t) => {
+                    const isMatch = src && t.getAttribute('data-thumb-src') === src;
+                    t.classList.toggle('is-active', isMatch);
+                    t.style.borderColor = isMatch ? 'var(--brand, #5c4d42)' : 'var(--border, #ddd)';
+                    t.style.borderWidth = isMatch ? '1.5px' : '1px';
+                });
+            }
+
+            function setActivePill(activePill) {
+                pills.forEach((p) => {
+                    const isMatch = p === activePill;
+                    p.classList.toggle('is-active', isMatch);
+                    p.style.borderColor = isMatch ? 'var(--brand, #5c4d42)' : '';
+                });
+            }
+
+            function applyVariant(matched) {
+                if (!matched) return;
+                if (variantIdInput && matched.id) {
+                    variantIdInput.value = String(matched.id);
+                }
+                if (skuEl && matched.sku) {
+                    skuEl.textContent = matched.sku;
+                }
+                if (priceEl && matched.final !== undefined) {
+                    priceEl.textContent = formatVnd(Number(matched.final));
+                }
+                if (stockEl && matched.stock !== undefined) {
+                    const qty = Number(matched.stock);
+                    stockEl.textContent = qty > 0 ? 'Còn ' + qty + ' sản phẩm' : 'Tạm hết hàng';
+                }
+            }
+
+            function selectByValues(valIds, fallbackSrc, fallbackTitle, pillEl) {
+                const normalized = valIds.map(Number).filter(Boolean).sort();
+                if (normalized.length > 0 && form) {
+                    normalized.forEach((vid) => {
+                        const radio = form.querySelector('input[type="radio"][value="' + vid + '"]');
+                        if (radio) radio.checked = true;
+                    });
+                }
 
                 const matched = variantList.find((v) => {
                     const vVals = Array.isArray(v.values) ? v.values.map(Number).sort() : [];
-                    return vVals.length === checkedIds.length && vVals.every((val, i) => val === checkedIds[i]);
-                });
-                applyVariant(matched);
+                    return vVals.length === normalized.length && normalized.length > 0 && vVals.every((val, i) => val === normalized[i]);
+                }) || (pillEl ? variantList.find((v) => Number(v.id) === Number(pillEl.getAttribute('data-variant-id'))) : null);
 
-                const matchingPill = pills.find((p) => {
-                    const pVals = (p.getAttribute('data-variant-values') || '').split(',').map(Number).filter(Boolean).sort();
-                    return pVals.length === checkedIds.length && pVals.every((val, i) => val === checkedIds[i]);
-                });
-                if (matchingPill) {
-                    setActivePill(matchingPill);
-                    const src = matchingPill.getAttribute('data-thumb-src') || '';
-                    if (src) {
-                        setMainImage(src, matchingPill.textContent.trim());
-                        setActiveThumb(src);
-                    }
+                if (fallbackSrc) {
+                    setMainImage(fallbackSrc, fallbackTitle || '');
+                    setActiveThumb(fallbackSrc);
                 }
-            });
-        });
-
-        form.addEventListener('submit', function (e) {
-            const requiredPill = form.querySelector('.js-variant-pill[data-required-variant="1"]');
-            if (requiredPill && (!variantIdInput || !variantIdInput.value)) {
-                e.preventDefault();
-                stockEl && (stockEl.textContent = 'Vui lòng chọn một phân loại trước khi thêm vào giỏ.');
+                if (pillEl) {
+                    setActivePill(pillEl);
+                }
+                applyVariant(matched);
             }
-        });
-    }
-    <?php endif ?>
-});
+
+            thumbs.forEach((btn) => {
+                btn.addEventListener('click', function() {
+                    const src = btn.getAttribute('data-thumb-src') || '';
+                    const valIds = (btn.getAttribute('data-variant-values') || '').split(',');
+                    const matchingPill = pills.find((p) => (p.getAttribute('data-variant-values') || '') === (btn.getAttribute('data-variant-values') || ''));
+                    selectByValues(valIds, src, btn.getAttribute('title') || '', matchingPill || null);
+                });
+            });
+
+            pills.forEach((pill) => {
+                pill.addEventListener('click', function() {
+                    const src = pill.getAttribute('data-thumb-src') || '';
+                    const valIds = (pill.getAttribute('data-variant-values') || '').split(',');
+                    selectByValues(valIds, src, pill.textContent.trim(), pill);
+                });
+            });
+
+            if (form) {
+                form.querySelectorAll('input[type="radio"]').forEach((radio) => {
+                    radio.addEventListener('change', function() {
+                        const checkedIds = Array.from(form.querySelectorAll('input[type="radio"]:checked'))
+                            .map((r) => Number(r.value))
+                            .sort();
+                        if (checkedIds.length === 0) return;
+
+                        const matched = variantList.find((v) => {
+                            const vVals = Array.isArray(v.values) ? v.values.map(Number).sort() : [];
+                            return vVals.length === checkedIds.length && vVals.every((val, i) => val === checkedIds[i]);
+                        });
+                        applyVariant(matched);
+
+                        const matchingPill = pills.find((p) => {
+                            const pVals = (p.getAttribute('data-variant-values') || '').split(',').map(Number).filter(Boolean).sort();
+                            return pVals.length === checkedIds.length && pVals.every((val, i) => val === checkedIds[i]);
+                        });
+                        if (matchingPill) {
+                            setActivePill(matchingPill);
+                            const src = matchingPill.getAttribute('data-thumb-src') || '';
+                            if (src) {
+                                setMainImage(src, matchingPill.textContent.trim());
+                                setActiveThumb(src);
+                            }
+                        }
+                    });
+                });
+
+                form.addEventListener('submit', function(e) {
+                    const requiredPill = form.querySelector('.js-variant-pill[data-required-variant="1"]');
+                    if (requiredPill && (!variantIdInput || !variantIdInput.value)) {
+                        e.preventDefault();
+                        stockEl && (stockEl.textContent = 'Vui lòng chọn một phân loại trước khi thêm vào giỏ.');
+                    }
+                });
+            }
+        <?php endif ?>
+    });
 </script>
 <?php $this->stop() ?>
