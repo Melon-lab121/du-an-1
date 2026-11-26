@@ -17,7 +17,7 @@
         <button class="btn btn-lg btn-block" type="submit">Đăng nhập</button>
         <p class="muted center">Chưa có tài khoản? <a href="<?= url('/register') ?>">Đăng ký</a></p>
         <?php if (config('app.debug')): ?>
-            <p class="muted small center">Demo: admin@example.com / admin123</p>
+            <p class="muted small center">Demo: admin@gmail.com / 12345678</p>
         <?php endif ?>
     </form>
 </section>

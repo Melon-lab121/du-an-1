@@ -7,6 +7,7 @@ use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\OrderController;
 use App\Controllers\Admin\ProductController;
 use App\Controllers\Admin\VoucherController;
+use App\Controllers\Admin\CommentController;
 use App\Core\Router;
 
 return function (Router $router): void {
@@ -26,6 +27,20 @@ return function (Router $router): void {
         // Biến thể động
         $r->post('/products/{id:\d+}/options', [ProductController::class, 'saveOptions'])->name('products.options');
         $r->post('/products/{id:\d+}/variants', [ProductController::class, 'saveVariants'])->name('products.variants');
+        $r->post('/products/{id:\d+}/variants/batch', [ProductController::class, 'batchStoreVariants']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/quick-update', [ProductController::class, 'quickUpdateVariant']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/force-delete', [ProductController::class, 'forceDeleteVariant']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/delete', [ProductController::class, 'softDeleteVariant']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/restore', [ProductController::class, 'restoreVariant']);
+        $r->get('/products/{id}/variants/trash', [ProductController::class, 'variantsTrash']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/quick-update', [ProductController::class, 'quickUpdateVariant']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/force-delete', [ProductController::class, 'forceDeleteVariant']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/delete', [ProductController::class, 'softDeleteVariant']);
+        $r->post('/products/{id:\d+}/variants/{variantId}/restore', [ProductController::class, 'restoreVariant']);
+
+        $r->get('/comments', [CommentController::class, 'index'])->name('admin.comments.index');
+        $r->post('/comments/{id:\d+}/toggle', [CommentController::class, 'toggleStatus'])->name('admin.comments.toggle');
+        $r->post('/comments/{id:\d+}/delete', [CommentController::class, 'destroy'])->name('admin.comments.destroy');
 
         $r->get('/categories', [CategoryController::class, 'index'])->name('categories.index');
         $r->post('/categories', [CategoryController::class, 'store'])->name('categories.store');

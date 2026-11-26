@@ -19,6 +19,11 @@ return function (Router $router): void {
     $router->get('/products', [ProductController::class, 'index'])->name('products.index');
     $router->get('/category/{slug}', [ProductController::class, 'category'])->name('category.show');
     $router->get('/product/{slug}', [ProductController::class, 'show'])->name('product.show');
+    
+    // Bình luận (chỉ cho phép khách đã đăng nhập)
+    $router->post('/product/{slug}/reviews', [ProductController::class, 'storeReview'])->name('product.reviews.store');
+    $router->post('/product/{slug}/comments', [ProductController::class, 'storeReview'])->name('product.comments.store');
+
 
     // Giỏ hàng
     $router->get('/cart', [CartController::class, 'index'])->name('cart.index');
