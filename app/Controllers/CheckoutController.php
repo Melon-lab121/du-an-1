@@ -15,6 +15,7 @@ use App\Services\OrderService;
 use App\Services\Payment\PaymentManager;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\SepayGateway;
+use App\Services\VoucherService;
 use DomainException;
 use RuntimeException;
 
@@ -25,6 +26,7 @@ final class CheckoutController extends Controller
         private OrderService $orders,
         private PaymentManager $gateways,
         private PaymentService $payments,
+        private VoucherService $vouchers,
         private Auth $auth,
         private Session $session,
         private Logger $logger,
@@ -39,12 +41,19 @@ final class CheckoutController extends Controller
             return $this->redirect('/cart');
         }
 
+        $user = $this->auth->user();
+        $userId = $this->auth->id();
+        $email = $user['email'] ?? null;
+        $phone = $user['phone'] ?? null;
+
         return $this->view('checkout/index', [
             'lines' => $lines,
             'totals' => $this->cart->totals($lines),
             'gateways' => $this->gateways->enabled(),
             'sepayMethods' => SepayGateway::PAYMENT_METHODS,
-            'user' => $this->auth->user(),
+            'user' => $user,
+            'availableVouchers' => $this->vouchers->availableForCart($lines, $userId, $email, $phone),
+            'checkoutVoucher' => $this->vouchers->applied($lines, $userId, $email, $phone),
         ]);
     }
 
@@ -63,6 +72,27 @@ final class CheckoutController extends Controller
             'name' => 'Họ tên', 'email' => 'Email', 'phone' => 'Số điện thoại', 'address' => 'Địa chỉ',
             'note' => 'Ghi chú', 'payment_method' => 'Phương thức thanh toán', 'sepay_method' => 'Hình thức SePay',
         ]);
+
+        // Đồng bộ voucher khách vừa chọn từ select ở trang đặt hàng (kể cả khi chưa kịp bấm nút Áp dụng)
+        if (array_key_exists('voucher_code_input', $request->all())) {
+            $selectedCode = strtoupper(trim((string) $request->input('voucher_code_input', '')));
+            if ($selectedCode === '') {
+                $this->vouchers->remove();
+            } else {
+                $vRes = $this->vouchers->apply(
+                    $selectedCode,
+                    $this->cart->lines(),
+                    $this->auth->id(),
+                    $data['email'],
+                    $data['phone'],
+                );
+                if (!$vRes['success']) {
+                    $this->flash('error', $vRes['message']);
+                    $this->session->flash('_old', $request->all());
+                    return $this->redirect('/checkout');
+                }
+            }
+        }
 
         try {
             $order = $this->orders->place(

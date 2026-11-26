@@ -367,4 +367,76 @@ final class VoucherService
     {
         $this->session->forget(self::SESSION_KEY);
     }
+
+    /**
+     * Danh sách các voucher đang hoạt động & còn hạn để hiển thị ở dropdown đặt hàng,
+     * kèm trạng thái đủ điều kiện hay chưa và số tiền tiết kiệm dự kiến.
+     *
+     * @param array<int, array<string, mixed>> $lines
+     * @return array<int, array{
+     *     voucher: array<string, mixed>,
+     *     eligible: bool,
+     *     discount: int,
+     *     description: string,
+     *     reason: ?string,
+     *     label: string
+     * }>
+     */
+    public function availableForCart(
+        array $lines,
+        ?int $userId = null,
+        ?string $email = null,
+        ?string $phone = null
+    ): array {
+        $now = date('Y-m-d H:i:s');
+        $vouchers = Voucher::query()->where('is_active', 1)->orderBy('id', 'DESC')->get();
+        $result = [];
+
+        foreach ($vouchers as $v) {
+            if (!empty($v['start_date']) && $now < $v['start_date']) {
+                continue;
+            }
+            if (!empty($v['end_date']) && $now > $v['end_date']) {
+                continue;
+            }
+
+            $eval = $this->evaluate($v, $lines, $userId, $email, $phone);
+            $vType = (int) ($v['voucher_type'] ?? 1);
+            $dType = (int) ($v['discount_type'] ?? 1);
+            $dVal = (int) ($v['discount_value'] ?? 0);
+            $maxCap = (int) ($v['max_discount_amount'] ?? 0);
+
+            $benefit = $dType === DiscountType::PERCENT
+                ? 'Giảm ' . $dVal . '%' . ($maxCap > 0 ? ', tối đa ' . money($maxCap) : '')
+                : 'Giảm ' . money($dVal);
+            if ($vType === VoucherType::FREESHIP) {
+                $benefit = $dType === DiscountType::PERCENT
+                    ? 'Freeship ' . $dVal . '%'
+                    : 'Freeship tối đa ' . money($dVal);
+            }
+
+            $eligible = $eval['valid'];
+            $label = $eligible
+                ? sprintf('%s — %s (−%s)', $v['code'], $benefit, money($eval['discount']))
+                : sprintf('%s — %s (%s)', $v['code'], $benefit, $eval['error'] ?? 'Chưa đủ điều kiện');
+
+            $result[] = [
+                'voucher' => $v,
+                'eligible' => $eligible,
+                'discount' => $eval['discount'],
+                'description' => $eval['description'],
+                'reason' => $eval['error'],
+                'label' => $label,
+            ];
+        }
+
+        usort($result, static function (array $a, array $b): int {
+            if ($a['eligible'] !== $b['eligible']) {
+                return $a['eligible'] ? -1 : 1;
+            }
+            return $b['discount'] <=> $a['discount'];
+        });
+
+        return $result;
+    }
 }
