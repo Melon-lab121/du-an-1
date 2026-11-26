@@ -75,32 +75,38 @@ $field = static fn (string $name, string $fallback = ''): string => e(old($name,
             </ul>
 
             <?php
-            $checkoutVoucher = function_exists('voucher') && function_exists('cart')
+            $checkoutVoucher = $checkoutVoucher ?? (function_exists('voucher')
                 ? voucher()->applied($lines, auth()->id(), $user['email'] ?? null, $user['phone'] ?? null)
-                : null;
+                : null);
+            $availableVouchers = $availableVouchers ?? (function_exists('voucher')
+                ? voucher()->availableForCart($lines, auth()->id(), $user['email'] ?? null, $user['phone'] ?? null)
+                : []);
+            $appliedCode = $checkoutVoucher['voucher']['code'] ?? '';
             ?>
             <div class="voucher-checkout-box" style="margin: 14px 0; padding: 12px; background: var(--bg); border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--text);">
-                <?php if ($checkoutVoucher): ?>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                        <div>
-                            <div style="font-weight: 600; color: var(--brand); display: flex; align-items: center; gap: 6px;">
-                                <span>🏷</span>
-                                <span><?= e($checkoutVoucher['voucher']['code']) ?></span>
-                            </div>
-                            <small class="muted" style="display: block; margin-top: 2px; font-size: 12px;"><?= e($checkoutVoucher['description']) ?></small>
-                        </div>
-                        <button type="submit" formaction="<?= url('/voucher/remove') ?>" formmethod="post" class="btn btn-sm btn-ghost" style="color: var(--danger); border-color: var(--danger);">Gỡ mã</button>
-                    </div>
-                <?php else: ?>
-                    <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text);">Mã ưu đãi / Voucher</label>
-                    <div style="display: flex; gap: 6px;">
-                        <input type="text" name="voucher_code_input" placeholder="Nhập mã ưu đãi..." style="flex: 1; text-transform: uppercase; padding: 6px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text);">
-                        <button type="submit" formaction="<?= url('/voucher/apply') ?>" formmethod="post" class="btn btn-sm btn-primary" style="white-space: nowrap;">Áp dụng</button>
-                    </div>
-                <?php endif ?>
+                <label for="checkout-voucher-select" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text);">Mã ưu đãi / Voucher</label>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <select name="voucher_code_input" id="checkout-voucher-select" data-voucher-select data-apply-url="<?= url('/voucher/apply') ?>" data-remove-url="<?= url('/voucher/remove') ?>" style="flex: 1; font-size: 13px; padding: 8px 10px; min-width: 0;">
+                        <option value=""><?= $availableVouchers ? '-- Không áp dụng voucher --' : '-- Không có voucher khả dụng --' ?></option>
+                        <?php foreach ($availableVouchers as $item): ?>
+                            <?php $vCode = (string) $item['voucher']['code']; ?>
+                            <option value="<?= e($vCode) ?>" <?= $appliedCode === $vCode ? 'selected' : '' ?> <?= !$item['eligible'] ? 'disabled' : '' ?>>
+                                <?= e($item['label']) ?>
+                            </option>
+                        <?php endforeach ?>
+                    </select>
+                    <button type="submit" formaction="<?= url('/voucher/apply') ?>" formmethod="post" formnovalidate class="btn btn-sm btn-primary" style="white-space: nowrap;">Áp dụng</button>
+                </div>
+                <small data-voucher-desc class="<?= $checkoutVoucher ? 'text-success' : 'muted' ?>" style="display: block; margin-top: 6px; font-size: 12px;">
+                    <?php if ($checkoutVoucher): ?>
+                        ✓ Đang áp dụng <strong><?= e($checkoutVoucher['voucher']['code']) ?></strong>: <?= e($checkoutVoucher['description']) ?>
+                    <?php endif ?>
+                </small>
             </div>
 
-            <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
+            <div id="checkout-order-summary">
+                <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
+            </div>
             <button class="btn btn-lg btn-block" type="submit">Đặt hàng</button>
             <p class="muted small">Bằng việc đặt hàng, bạn đồng ý với điều khoản mua hàng của chúng tôi.</p>
         </aside>
