@@ -27,8 +27,7 @@ $productId = (int) ($product['id'] ?? 0);
             <?php if ($hasVariants): ?>
                 <p class="field-full muted small">Sản phẩm có phân loại: giá hiển thị = giá thấp nhất, tồn kho = tổng tồn các biến thể (tự tính). Sửa ở bảng biến thể bên dưới.</p>
             <?php endif ?>
-            <label class="field field-full"><span>Mô tả ngắn</span><textarea name="short_description" rows="2"><?= $v('short_description') ?></textarea><?= $err('short_description') ?></label>
-            <label class="field field-full"><span>Mô tả chi tiết</span><textarea name="description" rows="8"><?= $v('description') ?></textarea></label>
+            <label class="field field-full"><span>Mô tả</span><textarea name="description" rows="8"><?= $v('description') ?></textarea></label>
         </div>
     </div>
 
@@ -125,7 +124,7 @@ $productId = (int) ($product['id'] ?? 0);
                 </thead>
                 <tbody id="new-variants-tbody">
                     <tr class="new-variant-row">
-                        <td data-label="Tên biến thể"><input type="text" name="new_variants[0][title]" placeholder="VD: Xám - 1m8" required></td>
+                        <td data-label="Tên biến thể"><input type="text" name="new_variants[0][title]" placeholder="VD: Màu: Xám, Chiều dài: 2m" required></td>
                         <td data-label="SKU"><input type="text" name="new_variants[0][sku]" placeholder="VD: SP0029-XAM" maxlength="64"></td>
                         <td data-label="Giá gốc"><input type="number" min="0" step="1000" name="new_variants[0][price]" value="0" style="width:125px;"></td>
                         <td data-label="Giá KM"><input type="number" min="0" step="1000" name="new_variants[0][sale_price]" placeholder="Tuỳ chọn" style="width:125px;"></td>

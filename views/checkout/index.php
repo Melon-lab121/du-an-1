@@ -1,12 +1,13 @@
 <?php
 $this->extend('layouts/main', ['title' => 'Đặt hàng']);
 /** @var array<string, App\Services\Payment\PaymentGatewayInterface> $gateways */
+$isGuest = empty($user);
 $selected = old('payment_method', array_key_first($gateways));
 $field = static fn (string $name, string $fallback = ''): string => e(old($name, $fallback));
 $checkoutSelectedKeys = $selectedKeys ?? array_map(static fn (array $l): string => (string) $l['key'], $lines);
 ?>
 <section class="container section">
-    <h1>Thông tin đặt hàng</h1>
+    <h1><?= $isGuest ? 'Thông tin liên hệ &amp; giao hàng (Khách vãng lai)' : 'Thông tin đặt hàng' ?></h1>
 
     <form action="<?= url('/checkout') ?>" method="post" class="checkout-layout" novalidate>
         <?= csrf_field() ?>
@@ -18,29 +19,34 @@ $checkoutSelectedKeys = $selectedKeys ?? array_map(static fn (array $l): string 
             <h3>Người nhận</h3>
             <div class="form-grid">
                 <label class="field">
-                    <span>Họ tên *</span>
-                    <input name="name" value="<?= $field('name', $user['name'] ?? '') ?>" required autocomplete="name">
-                    <?php if ($err = error('name')): ?><small class="error"><?= e($err) ?></small><?php endif ?>
-                </label>
-                <label class="field">
                     <span>Số điện thoại *</span>
-                    <input name="phone" value="<?= $field('phone', $user['phone'] ?? '') ?>" required autocomplete="tel" inputmode="tel">
+                    <input name="phone" value="<?= $field('phone', $user['phone'] ?? '') ?>" required autocomplete="tel" inputmode="tel" placeholder="VD: 0912345678">
                     <?php if ($err = error('phone')): ?><small class="error"><?= e($err) ?></small><?php endif ?>
                 </label>
-                <label class="field field-full">
-                    <span>Email *</span>
-                    <input type="email" name="email" value="<?= $field('email', $user['email'] ?? '') ?>" required autocomplete="email">
-                    <?php if ($err = error('email')): ?><small class="error"><?= e($err) ?></small><?php endif ?>
+                <label class="field">
+                    <span>Họ tên *</span>
+                    <input name="name" value="<?= $field('name', $user['name'] ?? '') ?>" required autocomplete="name" placeholder="Nhập họ và tên">
+                    <?php if ($err = error('name')): ?><small class="error"><?= e($err) ?></small><?php endif ?>
                 </label>
                 <label class="field field-full">
-                    <span>Địa chỉ nhận hàng *</span>
-                    <input name="address" value="<?= $field('address', $user['address'] ?? '') ?>" required autocomplete="street-address">
+                    <span>Địa chỉ giao hàng *</span>
+                    <input name="address" value="<?= $field('address', $user['address'] ?? '') ?>" required autocomplete="street-address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành">
                     <?php if ($err = error('address')): ?><small class="error"><?= e($err) ?></small><?php endif ?>
                 </label>
-                <label class="field field-full">
-                    <span>Ghi chú</span>
-                    <textarea name="note" rows="3"><?= $field('note') ?></textarea>
-                </label>
+                <?php if (!$isGuest): ?>
+                    <label class="field field-full">
+                        <span>Email *</span>
+                        <input type="email" name="email" value="<?= $field('email', $user['email'] ?? '') ?>" required autocomplete="email">
+                        <?php if ($err = error('email')): ?><small class="error"><?= e($err) ?></small><?php endif ?>
+                    </label>
+                    <label class="field field-full">
+                        <span>Ghi chú</span>
+                        <textarea name="note" rows="3"><?= $field('note') ?></textarea>
+                    </label>
+                <?php else: ?>
+                    <input type="hidden" name="email" value="<?= $field('email', 'guest@noithatluxe.local') ?>">
+                    <input type="hidden" name="is_guest_inquiry" value="1">
+                <?php endif ?>
             </div>
 
             <h3>Phương thức thanh toán</h3>
@@ -82,34 +88,17 @@ $checkoutSelectedKeys = $selectedKeys ?? array_map(static fn (array $l): string 
                 <?php endforeach ?>
             </ul>
 
-            <?php
-            $checkoutVoucher = function_exists('voucher') && function_exists('cart')
-                ? voucher()->applied($lines, auth()->id(), $user['email'] ?? null, $user['phone'] ?? null)
-                : null;
-            ?>
-            <div class="voucher-checkout-box" style="margin: 14px 0; padding: 12px; background: var(--bg); border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--text);">
-                <?php if ($checkoutVoucher): ?>
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                        <div>
-                            <div style="font-weight: 600; color: var(--brand); display: flex; align-items: center; gap: 6px;">
-                                <span>🏷</span>
-                                <span><?= e((string) $checkoutVoucher['voucher']['code']) ?></span>
-                            </div>
-                            <small class="muted" style="display: block; margin-top: 2px; font-size: 12px;"><?= e((string) $checkoutVoucher['description']) ?></small>
-                        </div>
-                        <button type="submit" formaction="<?= url('/voucher/remove') ?>" formmethod="post" class="btn btn-sm btn-ghost" style="color: var(--danger); border-color: var(--danger);">Gỡ mã</button>
-                    </div>
-                <?php else: ?>
-                    <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text);">Mã ưu đãi / Voucher</label>
-                    <div style="display: flex; gap: 6px;">
-                        <input type="text" name="voucher_code_input" placeholder="Nhập mã ưu đãi..." style="flex: 1; text-transform: uppercase; padding: 6px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text);">
-                        <button type="submit" formaction="<?= url('/voucher/apply') ?>" formmethod="post" class="btn btn-sm btn-primary" style="white-space: nowrap;">Áp dụng</button>
-                    </div>
-                <?php endif ?>
-            </div>
+            <?= $this->insert('partials/voucher-box', [
+                'inForm' => true,
+                'lines' => $lines,
+                'availableVouchers' => $availableVouchers ?? null,
+                'appliedVoucher' => $checkoutVoucher ?? null,
+            ]) ?>
 
-            <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
-            <button class="btn btn-lg btn-block" type="submit">Đặt hàng</button>
+            <div id="checkout-order-summary" data-voucher-summary>
+                <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
+            </div>
+            <button class="btn btn-lg btn-block" type="submit"><?= $isGuest ? 'Gửi thông tin đặt hàng' : 'Đặt hàng' ?></button>
             <p class="muted small">Bằng việc đặt hàng, bạn đồng ý với điều khoản mua hàng của chúng tôi.</p>
         </aside>
     </form>

@@ -1,6 +1,8 @@
 <?php $this->extend('layouts/main', ['title' => 'Giỏ hàng']) ?>
 <?php
 $remainingGuestSeconds = method_exists(cart(), 'guestRemainingSeconds') ? (int) cart()->guestRemainingSeconds() : 0;
+$highValueThreshold = 10000000;
+$highValueMaxQty = 3;
 ?>
 
 <section class="container section">
@@ -37,7 +39,14 @@ $remainingGuestSeconds = method_exists(cart(), 'guestRemainingSeconds') ? (int) 
                     </thead>
                     <tbody>
                     <?php foreach ($lines as $line): ?>
-                        <tr data-cart-row data-line-total="<?= (int) $line['total'] ?>">
+                        <?php
+                        $unitPrice = (int) $line['price'];
+                        $stockQty = (int) $line['stock'];
+                        $isHighValue = $unitPrice >= $highValueThreshold;
+                        $maxQty = $isHighValue ? min($stockQty, $highValueMaxQty) : $stockQty;
+                        $currentQty = min((int) $line['quantity'], max(0, $maxQty));
+                        ?>
+                        <tr data-cart-row data-line-total="<?= $unitPrice * $currentQty ?>">
                             <td class="col-check">
                                 <input
                                     type="checkbox"
@@ -61,25 +70,29 @@ $remainingGuestSeconds = method_exists(cart(), 'guestRemainingSeconds') ? (int) 
                                         <?php if (!empty($line['variant_label'])): ?>
                                             <br><small class="muted">Phân loại: <?= e((string) $line['variant_label']) ?></small>
                                         <?php endif ?>
+                                        <?php if ($isHighValue): ?>
+                                            <br><small class="muted">Sản phẩm ≥ 10 triệu: tối đa <?= $highValueMaxQty ?> cái/đơn</small>
+                                        <?php endif ?>
                                     </span>
                                 </a>
                             </td>
-                            <td data-label="Đơn giá"><?= money((int) $line['price']) ?></td>
+                            <td data-label="Đơn giá"><?= money($unitPrice) ?></td>
                             <td data-label="Số lượng">
                                 <div class="qty" data-qty>
                                     <button type="button" data-step="-1" aria-label="Giảm">−</button>
                                     <input
                                         type="number"
                                         name="quantities[<?= e((string) $line['key']) ?>]"
-                                        value="<?= (int) $line['quantity'] ?>"
+                                        value="<?= $currentQty ?>"
                                         min="0"
-                                        max="<?= (int) $line['stock'] ?>"
+                                        max="<?= $maxQty ?>"
+                                        data-max-qty="<?= $maxQty ?>"
                                         aria-label="Số lượng"
                                     >
                                     <button type="button" data-step="1" aria-label="Tăng">+</button>
                                 </div>
                             </td>
-                            <td data-label="Thành tiền"><strong><?= money((int) $line['total']) ?></strong></td>
+                            <td data-label="Thành tiền"><strong><?= money($unitPrice * $currentQty) ?></strong></td>
                             <td>
                                 <button
                                     class="btn-icon"
@@ -114,8 +127,15 @@ $remainingGuestSeconds = method_exists(cart(), 'guestRemainingSeconds') ? (int) 
             <aside class="card">
                 <h3>Tóm tắt đơn hàng</h3>
                 <p class="muted" id="selected-items-summary">Đang chọn toàn bộ giỏ hàng</p>
-                <?= $this->insert('partials/voucher-box') ?>
-                <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
+                <?= $this->insert('partials/voucher-box', [
+                    'inForm' => false,
+                    'lines' => $lines,
+                    'availableVouchers' => $availableVouchers ?? null,
+                    'appliedVoucher' => $appliedVoucher ?? null,
+                ]) ?>
+                <div id="cart-order-summary" data-voucher-summary>
+                    <?= $this->insert('partials/order-summary', ['totals' => $totals]) ?>
+                </div>
                 <a
                     class="btn btn-lg btn-block"
                     id="proceed-checkout-btn"
@@ -130,6 +150,16 @@ $remainingGuestSeconds = method_exists(cart(), 'guestRemainingSeconds') ? (int) 
 <?php $this->start('scripts') ?>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('input[data-max-qty]').forEach(function (input) {
+        const cap = Number(input.dataset.maxQty);
+        if (!Number.isFinite(cap)) return;
+        input.addEventListener('change', function () {
+            if (Number(input.value) > cap) {
+                input.value = String(cap);
+            }
+        });
+    });
+
     const checkboxes = Array.from(document.querySelectorAll('.cart-item-checkbox'));
     if (checkboxes.length === 0) return;
 
@@ -138,22 +168,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const checkoutBtn = document.getElementById('proceed-checkout-btn');
     const summaryText = document.getElementById('selected-items-summary');
 
-    const summaryEl = document.querySelector('dl.summary');
-    const subtotalEl = summaryEl ? summaryEl.querySelector('[data-summary-subtotal]') : null;
-    const discountRowEl = summaryEl ? summaryEl.querySelector('[data-summary-discount-row]') : null;
-    const discountEl = summaryEl ? summaryEl.querySelector('[data-summary-discount]') : null;
-    const shippingEl = summaryEl ? summaryEl.querySelector('[data-summary-shipping]') : null;
-    const totalEl = summaryEl ? summaryEl.querySelector('[data-summary-total]') : null;
+    let summaryEl, subtotalEl, discountRowEl, discountEl, shippingEl, totalEl;
+    let initialSubtotal = 0, initialDiscount = 0, initialShipping = 0, initialTotal = 0;
+    let initialSubtotalText = '', initialDiscountText = '', initialShippingText = '', initialTotalText = '';
 
-    const initialSubtotal = summaryEl ? Number(summaryEl.dataset.initialSubtotal || 0) : 0;
-    const initialDiscount = summaryEl ? Number(summaryEl.dataset.initialDiscount || 0) : 0;
-    const initialShipping = summaryEl ? Number(summaryEl.dataset.initialShipping || 0) : 0;
-    const initialTotal = summaryEl ? Number(summaryEl.dataset.initialTotal || 0) : 0;
+    function refreshSummaryRefs() {
+        const container = document.getElementById('cart-order-summary') || document;
+        summaryEl = container.querySelector('dl.summary');
+        subtotalEl = summaryEl ? summaryEl.querySelector('[data-summary-subtotal]') : null;
+        discountRowEl = summaryEl ? summaryEl.querySelector('[data-summary-discount-row]') : null;
+        discountEl = summaryEl ? summaryEl.querySelector('[data-summary-discount]') : null;
+        shippingEl = summaryEl ? summaryEl.querySelector('[data-summary-shipping]') : null;
+        totalEl = summaryEl ? summaryEl.querySelector('[data-summary-total]') : null;
 
-    const initialSubtotalText = subtotalEl ? subtotalEl.textContent : '';
-    const initialDiscountText = discountEl ? discountEl.textContent : '';
-    const initialShippingText = shippingEl ? shippingEl.textContent : '';
-    const initialTotalText = totalEl ? totalEl.textContent : '';
+        initialSubtotal = summaryEl ? Number(summaryEl.dataset.initialSubtotal || 0) : 0;
+        initialDiscount = summaryEl ? Number(summaryEl.dataset.initialDiscount || 0) : 0;
+        initialShipping = summaryEl ? Number(summaryEl.dataset.initialShipping || 0) : 0;
+        initialTotal = summaryEl ? Number(summaryEl.dataset.initialTotal || 0) : 0;
+
+        initialSubtotalText = subtotalEl ? subtotalEl.textContent : '';
+        initialDiscountText = discountEl ? discountEl.textContent : '';
+        initialShippingText = shippingEl ? shippingEl.textContent : '';
+        initialTotalText = totalEl ? totalEl.textContent : '';
+    }
+    refreshSummaryRefs();
 
     const formatVnd = (amount) =>
         new Intl.NumberFormat('vi-VN').format(Math.max(0, Math.round(amount))) + ' ₫';
@@ -274,6 +312,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    document.addEventListener('voucher:updated', () => {
+        refreshSummaryRefs();
+        syncCheckoutState();
+    });
 
     syncCheckoutState();
 });

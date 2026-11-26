@@ -8,6 +8,7 @@ $menu = [
     ['/admin/categories', 'Danh mục', '🗂', '/admin/categories*'],
     ['/admin/vouchers', 'Voucher', '🏷', '/admin/vouchers*'],
     ['/admin/comments', 'Bình luận', '🏷', '/admin/comments*'],
+    ['/admin/users', 'Tài khoản', '🏷', '/admin/users*'],
 ];
 ?>
 <!doctype html>

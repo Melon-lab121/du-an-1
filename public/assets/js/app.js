@@ -188,4 +188,65 @@
             setCategoryExpanded(false, true);
         });
     }
+
+    // Giỏ hàng & Đặt hàng: chọn voucher từ select option tự động áp dụng / gỡ mã qua AJAX không tải lại trang
+    const voucherSelect = document.querySelector('[data-voucher-select]');
+    if (voucherSelect) {
+        const summaryBox = document.querySelector('[data-voucher-summary]') || document.getElementById('checkout-order-summary');
+        const descEl = document.querySelector('[data-voucher-desc]');
+
+        voucherSelect.addEventListener('change', async () => {
+            const code = voucherSelect.value.trim();
+            const url = code ? voucherSelect.dataset.applyUrl : voucherSelect.dataset.removeUrl;
+            if (!url) return;
+
+            const body = new FormData();
+            body.append('_token', csrf);
+            if (code) body.append('code', code);
+
+            const checkoutForm = voucherSelect.closest('form');
+            if (checkoutForm) {
+                checkoutForm.querySelectorAll('input[name="selected_keys[]"]').forEach((input) => {
+                    if (input.value) body.append('selected_keys[]', input.value);
+                });
+            }
+
+            voucherSelect.disabled = true;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    body,
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf },
+                    credentials: 'same-origin',
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    if (summaryBox && data.summary_html) {
+                        summaryBox.innerHTML = data.summary_html;
+                    }
+                    if (descEl) {
+                        if (data.applied) {
+                            descEl.className = 'text-success';
+                            descEl.innerHTML = '';
+                            const strong = document.createElement('strong');
+                            strong.textContent = data.applied.code;
+                            descEl.append('✓ Đang áp dụng ', strong, `: ${data.applied.description}`);
+                        } else {
+                            descEl.className = 'muted';
+                            descEl.textContent = '';
+                        }
+                    }
+                    document.dispatchEvent(new CustomEvent('voucher:updated', { detail: data }));
+                    toast(data.message || 'Đã cập nhật voucher');
+                } else {
+                    toast(data.message || 'Không áp dụng được voucher', true);
+                    if (!data.applied) voucherSelect.value = '';
+                }
+            } catch {
+                toast('Không kết nối được máy chủ', true);
+            } finally {
+                voucherSelect.disabled = false;
+            }
+        });
+    }
 })();

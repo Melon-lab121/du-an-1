@@ -6,20 +6,22 @@ use App\Services\DashboardStats;
 /** @var array{revenue: int|float, orders: int, pending: int, products: int, customers: int, low_stock: int} $stats */
 /** @var array{labels: list<string>, revenue: list<int>, orders: list<int>} $chart */
 /** @var string $orderStatus */
-/** @var string $staffSort */
 /** @var string $productSort */
 /** @var string $stock */
 /** @var array<string, int> $statusCounts */
 /** @var int $filteredOrderCount */
 /** @var array<int, array<string, mixed>> $filteredOrders */
-/** @var array<int, array{id: int, name: string, email: string, role: string, revenue: int, order_count: int}> $staffRows */
+/** @var array<int, array<string, mixed>> $recentReturns */
+/** @var array<int, array<string, mixed>> $mergeGroups */
 /** @var array<int, array{id: int, name: string, stock: int, sold: int}> $productRows */
 
 $this->extend('layouts/admin', ['title' => 'Tổng quan', 'heading' => 'Tổng quan']);
 
+$recentReturns = $recentReturns ?? [];
+$mergeGroups = $mergeGroups ?? [];
+
 $keep = array_filter([
     'order_status' => $orderStatus,
-    'staff_sort' => $staffSort,
     'product_sort' => $productSort,
     'stock' => $stock,
 ], static fn (string $value): bool => $value !== '');
@@ -53,6 +55,47 @@ $dashUrl = static function (array $overrides) use ($keep): string {
 
 <div class="card section">
     <div class="section-head">
+        <h3>Gợi ý gom đơn (mua cùng sản phẩm qua nhiều đơn)</h3>
+        <span class="muted"><?= count($mergeGroups) ?> nhóm cần CSKH liên hệ</span>
+    </div>
+    <?php if ($mergeGroups === []): ?>
+        <div class="dash-empty">Chưa có khách nào đặt trùng sản phẩm trên nhiều đơn mở.</div>
+    <?php else: ?>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Khách hàng / SĐT</th>
+                    <th>Sản phẩm</th>
+                    <th>Số đơn</th>
+                    <th>Tổng SL</th>
+                    <th>Mã đơn liên quan</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($mergeGroups as $grp): ?>
+                <tr>
+                    <td>
+                        <strong><?= e((string) $grp['customer_name']) ?></strong><br>
+                        <small class="muted"><?= e((string) $grp['customer_phone']) ?></small>
+                    </td>
+                    <td>
+                        <?= e((string) $grp['product_name']) ?>
+                        <?php if (!empty($grp['variant_label'])): ?>
+                            <br><small class="muted"><?= e((string) $grp['variant_label']) ?></small>
+                        <?php endif ?>
+                    </td>
+                    <td data-label="Số đơn"><strong><?= (int) $grp['order_count'] ?></strong></td>
+                    <td data-label="Tổng SL"><?= (int) $grp['total_qty'] ?></td>
+                    <td data-label="Mã đơn liên quan"><?= e((string) ($grp['order_codes'] ?? '—')) ?></td>
+                </tr>
+            <?php endforeach ?>
+            </tbody>
+        </table>
+    <?php endif ?>
+</div>
+
+<div class="card section">
+    <div class="section-head">
         <h3>Đơn hàng</h3>
         <span class="muted"><?= number_format($filteredOrderCount) ?> đơn<?= $orderStatus !== '' ? ' · ' . e(Order::statusLabel($orderStatus)) : '' ?></span>
     </div>
@@ -69,7 +112,6 @@ $dashUrl = static function (array $overrides) use ($keep): string {
     </div>
 
     <form class="toolbar" method="get" action="<?= url('/admin') ?>">
-        <input type="hidden" name="staff_sort" value="<?= e($staffSort) ?>">
         <input type="hidden" name="product_sort" value="<?= e($productSort) ?>">
         <input type="hidden" name="stock" value="<?= e($stock) ?>">
         <select name="order_status" aria-label="Lọc đơn hàng theo trạng thái">
@@ -87,35 +129,42 @@ $dashUrl = static function (array $overrides) use ($keep): string {
 
 <div class="card section">
     <div class="section-head">
-        <h3>Nhân viên theo doanh số</h3>
-        <span class="muted">Chỉ đơn đã thanh toán</span>
+        <h3>Lượt trả hàng gần đây</h3>
+        <a href="<?= url('/admin/orders?status=returned') ?>">Xem đơn trả hàng →</a>
     </div>
-    <form class="toolbar" method="get" action="<?= url('/admin') ?>">
-        <input type="hidden" name="order_status" value="<?= e($orderStatus) ?>">
-        <input type="hidden" name="product_sort" value="<?= e($productSort) ?>">
-        <input type="hidden" name="stock" value="<?= e($stock) ?>">
-        <select name="staff_sort" aria-label="Lọc nhân viên theo doanh số">
-            <?php foreach (DashboardStats::STAFF_SORTS as $value => $label): ?>
-                <option value="<?= e($value) ?>" <?= $staffSort === $value ? 'selected' : '' ?>><?= e($label) ?></option>
-            <?php endforeach ?>
-        </select>
-        <button class="btn btn-sm" type="submit">Lọc</button>
-    </form>
-    <?php if ($staffRows === []): ?>
-        <div class="dash-empty">Chưa có nhân viên.</div>
+    <?php if ($recentReturns === []): ?>
+        <div class="dash-empty">Chưa có yêu cầu trả hàng nào.</div>
     <?php else: ?>
         <table class="table">
-            <thead><tr><th>Nhân viên</th><th>Vai trò</th><th>Số đơn</th><th>Doanh số</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Mã đơn</th>
+                    <th>Khách hàng</th>
+                    <th>Lý do &amp; mô tả / STK</th>
+                    <th>Trạng thái</th>
+                    <th>Thời gian</th>
+                </tr>
+            </thead>
             <tbody>
-            <?php foreach ($staffRows as $row): ?>
+            <?php foreach ($recentReturns as $ret): ?>
                 <tr>
                     <td>
-                        <strong><?= e($row['name']) ?></strong><br>
-                        <small class="muted"><?= e($row['email']) ?></small>
+                        <?php if (!empty($ret['order_id'])): ?>
+                            <a href="<?= url('/admin/orders/' . (int) $ret['order_id']) ?>"><strong><?= e((string) ($ret['order_code'] ?? ('#' . $ret['order_id']))) ?></strong></a>
+                        <?php else: ?>
+                            <strong><?= e((string) ($ret['order_code'] ?? '—')) ?></strong>
+                        <?php endif ?>
                     </td>
-                    <td data-label="Vai trò"><?= e($row['role'] === 'admin' ? 'Quản trị' : 'Nhân viên') ?></td>
-                    <td data-label="Số đơn"><?= number_format($row['order_count']) ?></td>
-                    <td data-label="Doanh số"><?= money($row['revenue']) ?></td>
+                    <td data-label="Khách hàng">
+                        <?= e((string) ($ret['customer_name'] ?? 'Khách')) ?><br>
+                        <small class="muted"><?= e((string) ($ret['customer_phone'] ?? '')) ?></small>
+                    </td>
+                    <td data-label="Lý do & mô tả / STK">
+                        <strong><?= e(Order::RETURN_REASONS[$ret['reason']] ?? (string) ($ret['reason'] ?? '')) ?></strong><br>
+                        <small><?= e((string) ($ret['description'] ?? '')) ?></small>
+                    </td>
+                    <td data-label="Trạng thái"><span class="tag"><?= e((string) ($ret['status'] ?? 'pending')) ?></span></td>
+                    <td data-label="Thời gian"><?= e(date('d/m/Y H:i', strtotime((string) ($ret['created_at'] ?? 'now')))) ?></td>
                 </tr>
             <?php endforeach ?>
             </tbody>
@@ -130,7 +179,6 @@ $dashUrl = static function (array $overrides) use ($keep): string {
     </div>
     <form class="toolbar" method="get" action="<?= url('/admin') ?>">
         <input type="hidden" name="order_status" value="<?= e($orderStatus) ?>">
-        <input type="hidden" name="staff_sort" value="<?= e($staffSort) ?>">
         <select name="product_sort" aria-label="Lọc sản phẩm theo lượt mua hoặc tồn kho">
             <?php foreach (DashboardStats::PRODUCT_SORTS as $value => $label): ?>
                 <option value="<?= e($value) ?>" <?= $productSort === $value ? 'selected' : '' ?>><?= e($label) ?></option>
