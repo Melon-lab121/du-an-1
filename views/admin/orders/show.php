@@ -1,9 +1,6 @@
 <?php
 use App\Models\Order;
 
-$history = $history ?? [];
-$nextStatuses = $nextStatuses ?? [];
-
 $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' => 'Đơn hàng ' . $order['code']]);
 ?>
 <div class="order-pills section-sm">
@@ -11,18 +8,6 @@ $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' 
     <?= $this->insert('partials/status-pill', ['status' => $order['payment_status'], 'type' => 'payment']) ?>
     <span class="muted">Đặt lúc <?= e(date('H:i d/m/Y', strtotime((string) $order['created_at']))) ?></span>
 </div>
-
-<?php if ($order['payment_status'] === 'refund_needed'): ?>
-    <div class="card section-sm">
-        <p><strong>Cần hoàn tiền cho khách: <?= money($order['total']) ?></strong><br>
-            <span class="muted">Khách đã thanh toán nhưng đơn đã bị huỷ. Hãy hoàn tiền thủ công qua cổng thanh toán rồi liên hệ khách.</span></p>
-        <form action="<?= url('/admin/orders/' . (int) $order['id'] . '/refunded') ?>" method="post" class="stack">
-            <?= csrf_field() ?>
-            <input type="text" name="note" maxlength="255" placeholder="Ghi chú (vd: mã giao dịch hoàn tiền)">
-            <button class="btn btn-sm" type="submit" data-confirm="Xác nhận đã hoàn tiền cho khách?">Đã hoàn tiền</button>
-        </form>
-    </div>
-<?php endif ?>
 
 <div class="cart-layout">
     <div>
@@ -42,34 +27,6 @@ $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' 
                 <?php endforeach ?>
                 </tbody>
             </table>
-        </div>
-
-        <div class="card section">
-            <h3>Lịch sử trạng thái</h3>
-            <?php if (!$history): ?>
-                <p class="muted">Chưa có lịch sử.</p>
-            <?php else: ?>
-                <table class="table">
-                    <thead><tr><th>Thời gian</th><th>Từ</th><th>Sang</th><th>Người thực hiện</th><th>Ghi chú</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($history as $h): ?>
-                        <tr>
-                            <td><?= e(date('H:i d/m/Y', strtotime((string) $h['created_at']))) ?></td>
-                            <td data-label="Từ"><?= $h['from_status'] !== null ? e(Order::statusLabel((string) $h['from_status'])) : '—' ?></td>
-                            <td data-label="Sang"><?= $this->insert('partials/status-pill', ['status' => $h['to_status']]) ?></td>
-                            <td data-label="Người thực hiện">
-                                <?php if ($h['changed_by'] === null): ?>
-                                    Hệ thống
-                                <?php else: ?>
-                                    <?= e($h['changed_by_name'] ?? ('#' . (int) $h['changed_by'])) ?>
-                                <?php endif ?>
-                            </td>
-                            <td data-label="Ghi chú"><?= e($h['note'] ?? '—') ?></td>
-                        </tr>
-                    <?php endforeach ?>
-                    </tbody>
-                </table>
-            <?php endif ?>
         </div>
 
         <div class="card section">
@@ -107,21 +64,16 @@ $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' 
     <aside>
         <div class="card">
             <h3>Cập nhật trạng thái</h3>
-            <?php if ($nextStatuses === []): ?>
-                <p class="muted">Đơn đang ở trạng thái cuối (<?= e(Order::statusLabel((string) $order['status'])) ?>), không thể đổi tiếp.</p>
-            <?php else: ?>
-                <form action="<?= url('/admin/orders/' . (int) $order['id'] . '/status') ?>" method="post" class="stack">
-                    <?= csrf_field() ?>
-                    <select name="status">
-                        <?php foreach ($nextStatuses as $value): ?>
-                            <option value="<?= e($value) ?>"><?= e(Order::statusLabel($value)) ?></option>
-                        <?php endforeach ?>
-                    </select>
-                    <input type="text" name="note" maxlength="255" placeholder="Ghi chú (không bắt buộc)">
-                    <button class="btn btn-block" type="submit" data-confirm="Cập nhật trạng thái đơn hàng?">Lưu</button>
-                    <small class="muted">Huỷ đơn sẽ tự hoàn lại tồn kho. Đơn đã thanh toán mà huỷ sẽ chuyển sang "Cần hoàn tiền".</small>
-                </form>
-            <?php endif ?>
+            <form action="<?= url('/admin/orders/' . (int) $order['id'] . '/status') ?>" method="post" class="stack">
+                <?= csrf_field() ?>
+                <select name="status" <?= $order['status'] === 'cancelled' ? 'disabled' : '' ?>>
+                    <?php foreach (Order::STATUSES as $value => $label): ?>
+                        <option value="<?= $value ?>" <?= $order['status'] === $value ? 'selected' : '' ?>><?= $label ?></option>
+                    <?php endforeach ?>
+                </select>
+                <button class="btn btn-block" type="submit" <?= $order['status'] === 'cancelled' ? 'disabled' : '' ?> data-confirm="Cập nhật trạng thái đơn hàng?">Lưu</button>
+                <small class="muted">Huỷ đơn sẽ tự hoàn lại tồn kho.</small>
+            </form>
         </div>
         <div class="card section-sm">
             <h3>Khách hàng</h3>
