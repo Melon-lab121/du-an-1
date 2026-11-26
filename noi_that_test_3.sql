@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 26, 2026 at 08:26 AM
+-- Generation Time: Nov 26, 2026 at 01:49 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -72,11 +72,13 @@ CREATE TABLE `cart_details` (
 --
 
 INSERT INTO `cart_details` (`id`, `cart_id`, `product_id`, `variant_id`, `quantity`) VALUES
-(22, 1, 34, NULL, 1),
-(23, 1, 31, NULL, 1),
-(24, 1, 52, NULL, 1),
 (26, 2, 74, NULL, 1),
-(27, 2, 52, NULL, 1);
+(27, 2, 52, NULL, 1),
+(32, 1, 34, NULL, 1),
+(33, 1, 31, NULL, 1),
+(34, 1, 52, NULL, 1),
+(35, 1, 51, NULL, 1),
+(36, 1, 30, NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -202,7 +204,7 @@ CREATE TABLE `comments` (
 --
 
 INSERT INTO `comments` (`id`, `user_id`, `product_id`, `rating`, `body`, `status`, `created_at`, `updated_at`) VALUES
-(5, 10, 51, 5, 'nice', 'approved', '2026-11-26 14:08:24', '2026-11-26 14:08:24');
+(6, 10, 52, 5, 'Đẹp', 'approved', '2026-11-26 19:28:02', '2026-11-26 19:28:02');
 
 -- --------------------------------------------------------
 
@@ -266,7 +268,9 @@ INSERT INTO `orders` (`id`, `code`, `date`, `total`, `user_id`, `customer_name`,
 (9, 'DH261122CE28B0', NULL, 26225000, NULL, 'Huy Quang', 'huyq8545@gmail.com', '0977214236', 'Thanh Hóa', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 13:21:13', '2026-11-22 13:20:28', '2026-11-22 13:21:13'),
 (10, 'DH26112269E6E2', NULL, 17599750, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 17599750, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 16:06:59', '2026-11-22 16:06:47', '2026-11-22 16:06:59'),
 (11, 'DH261124E24DE5', NULL, 26225000, NULL, 'Huy', 'huy@gmail.con', '0987564859', 'Thanh Hoá', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-24 13:32:05', '2026-11-24 13:31:43', '2026-11-24 13:32:05'),
-(12, 'DH2611265A7FD5', NULL, 1824500, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 1824500, 0, 0, NULL, 'cod', 'unpaid', 'pending', NULL, '2026-11-26 00:55:53', '2026-11-26 00:55:53');
+(12, 'DH2611265A7FD5', NULL, 1824500, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 1824500, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-26 19:09:20', '2026-11-26 00:55:53', '2026-11-26 19:09:20'),
+(13, 'DH2611268AE1F8', NULL, 26225000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 26225000, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-26 18:11:24', '2026-11-26 18:10:19', '2026-11-26 18:11:24'),
+(14, 'DH261126321A16', NULL, 12475000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 12475000, 0, 0, NULL, 'cod', 'unpaid', 'confirmed', NULL, '2026-11-26 18:12:48', '2026-11-26 18:13:12');
 
 -- --------------------------------------------------------
 
@@ -304,7 +308,9 @@ INSERT INTO `order_items` (`id`, `order_id`, `product_id`, `variant_id`, `produc
 (10, 10, 51, NULL, 'VRIGSTAD mirror, sedge, 24 ¾\"', NULL, 'SP0051', 1499750, 1, 1499750),
 (11, 11, 52, NULL, 'VRETSTORP sleeper sofa, Kilanda light beige', NULL, 'SP0052', 26225000, 1, 26225000),
 (12, 12, 31, NULL, 'ZAMIOCULCAS potted plant, Aroid palm, 6\"', NULL, 'SP0031', 324750, 1, 324750),
-(13, 12, 51, NULL, 'VRIGSTAD mirror, sedge, 24 ¾\"', NULL, 'SP0051', 1499750, 1, 1499750);
+(13, 12, 51, NULL, 'VRIGSTAD mirror, sedge, 24 ¾\"', NULL, 'SP0051', 1499750, 1, 1499750),
+(14, 13, 52, NULL, 'VRETSTORP sleeper sofa, Kilanda light beige', NULL, 'SP0052', 26225000, 1, 26225000),
+(15, 14, 49, NULL, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', NULL, 'SP0049', 12475000, 1, 12475000);
 
 -- --------------------------------------------------------
 
@@ -317,6 +323,34 @@ CREATE TABLE `order_status` (
   `status` varchar(255) NOT NULL,
   `order_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `order_status_histories`
+--
+
+CREATE TABLE `order_status_histories` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `order_id` bigint(20) UNSIGNED NOT NULL,
+  `from_status` varchar(20) DEFAULT NULL,
+  `to_status` varchar(20) NOT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `changed_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `order_status_histories`
+--
+
+INSERT INTO `order_status_histories` (`id`, `order_id`, `from_status`, `to_status`, `note`, `changed_by`, `created_at`) VALUES
+(1, 13, NULL, 'pending', 'Khách đặt hàng', NULL, '2026-11-26 18:10:19'),
+(2, 13, 'pending', 'confirmed', NULL, 9, '2026-11-26 18:11:06'),
+(3, 13, 'confirmed', 'shipping', NULL, 9, '2026-11-26 18:11:16'),
+(4, 13, 'shipping', 'completed', NULL, 9, '2026-11-26 18:11:24'),
+(5, 14, NULL, 'pending', 'Khách đặt hàng', NULL, '2026-11-26 18:12:48'),
+(6, 14, 'pending', 'confirmed', NULL, 9, '2026-11-26 18:13:12');
 
 -- --------------------------------------------------------
 
@@ -403,10 +437,10 @@ INSERT INTO `products` (`id`, `category_id`, `name`, `slug`, `sku`, `short_descr
 (46, 41, 'YLLEVAD frame, black, 8 ¼x11 ¾\"', 'yllevad-frame-black-8-x11', 'SP0046', 'YLLEVAD frame, black, 8 ¼x11 ¾\" This frame is ideal to use with ALFTA adhesive hook. With the hook you can easily hang the frame without nails or screws and decorate your walls with pictures. Can be used hanging or standing, both horizontally and ver...', 'YLLEVAD frame, black, 8 ¼x11 ¾\" This frame is ideal to use with ALFTA adhesive hook. With the hook you can easily hang the frame without nails or screws and decorate your walls with pictures. Can be used hanging or standing, both horizontally and vertically, to fit in the space available.', 124750, NULL, 10, 'https://www.ikea.com/us/en/images/p/786f019f8c02795e/yllevad-frame-black/PE781591.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (47, 41, 'YLLEVAD Collage frame for 4 photos, black', 'yllevad-collage-frame-for-4-photos-black', 'SP0047', 'YLLEVAD Collage frame for 4 photos, black. The smart snap-on function allows you to easily fix your pictures in place, and quickly replace them whenever you like. Holds 4 pictures so you can create your own personal collage....', 'YLLEVAD Collage frame for 4 photos, black. The smart snap-on function allows you to easily fix your pictures in place, and quickly replace them whenever you like. Holds 4 pictures so you can create your own personal collage.', 124750, NULL, 10, 'https://www.ikea.com/us/en/images/p/143dfae56ce8b387/roedalm-frame-for-9-pictures-black/PE924271.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (48, 41, 'YLLEVAD art card, flowers-blooming, 4x6\"', 'yllevad-art-card-flowers-blooming-4x6', 'SP0048', 'YLLEVAD art card, flowers-blooming, 4x6\" Artwork makes a difference and adds a personal touch to your home, even if you’re not the artist. With YLLEVAD art cards you can create your own mini-gallery on a wall or shelf in a flash. Motif created by Iri...', 'YLLEVAD art card, flowers-blooming, 4x6\" Artwork makes a difference and adds a personal touch to your home, even if you’re not the artist. With YLLEVAD art cards you can create your own mini-gallery on a wall or shelf in a flash. Motif created by Irika Sandström and Sophie Wiking Ekman.', 24750, NULL, 10, 'https://www.ikea.com/us/en/images/products/vaexbo-art-card-wild-herbs__1416537_pe975626_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(49, 49, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', 'ygsbo-over-the-range-convection-microwave-stainless-steel-30', 'SP0049', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortles...', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortlessly.', 12475000, NULL, 9, 'https://www.ikea.com/us/en/images/p/4e64d079ae3aa31b/ygsbo-over-the-range-convection-microwave-stainless-steel/PE970369.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(49, 49, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', 'ygsbo-over-the-range-convection-microwave-stainless-steel-30', 'SP0049', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortles...', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortlessly.', 12475000, NULL, 8, 'https://www.ikea.com/us/en/images/p/4e64d079ae3aa31b/ygsbo-over-the-range-convection-microwave-stainless-steel/PE970369.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (50, 22, 'VUKU wardrobe, white, 291/8x201/8x585/8\"', 'vuku-wardrobe-white-2918x2018x5858', 'SP0050', 'VUKU wardrobe, white, 291/8x201/8x585/8\" Inspired by the ingenuity of tents, we worked with tent suppliers to develop this wardrobe. Great for seasonal clothes or when you need to bring your wardrobe with you. Roll it and bring it along. Easy to brin...', 'VUKU wardrobe, white, 291/8x201/8x585/8\" Inspired by the ingenuity of tents, we worked with tent suppliers to develop this wardrobe. Great for seasonal clothes or when you need to bring your wardrobe with you. Roll it and bring it along. Easy to bring home since it is roll packed.', 324750, NULL, 10, 'https://www.ikea.com/us/en/images/p/906d1eeeb66890e/vuku-wardrobe-white/PH196296.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (51, 41, 'VRIGSTAD mirror, sedge, 24 ¾\"', 'vrigstad-mirror-sedge-24', 'SP0051', 'VRIGSTAD mirror, sedge, 24 ¾\" Embrace nature! This mirror in hand-woven rattan gives your room a depth that makes it feel extra vibrant. Whether you hang up one, several or combine them with paintings, they make a strong impression. Provided with saf...', 'VRIGSTAD mirror, sedge, 24 ¾\" Embrace nature! This mirror in hand-woven rattan gives your room a depth that makes it feel extra vibrant. Whether you hang up one, several or combine them with paintings, they make a strong impression. Provided with safety film - reduces damage if glass is broken.', 1499750, NULL, 8, 'https://www.ikea.com/us/en/images/p/4b6514ac1d035ed6/hovet-mirror-gold/PE985737.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(52, 60, 'VRETSTORP sleeper sofa, Kilanda light beige', 'vretstorp-sleeper-sofa-kilanda-light-beige', 'SP0052', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes ope...', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open.', 26225000, NULL, 8, 'https://www.ikea.com/us/en/images/p/181caf7533def9fb/kivik-1-seat-sleeper-sofa-kelinge-gray-turquoise/PE890987.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(52, 60, 'VRETSTORP sleeper sofa, Kilanda light beige', 'vretstorp-sleeper-sofa-kilanda-light-beige', 'SP0052', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes ope...', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open.', 26225000, NULL, 7, 'https://www.ikea.com/us/en/images/p/181caf7533def9fb/kivik-1-seat-sleeper-sofa-kelinge-gray-turquoise/PE890987.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (53, 60, 'VRETSTORP sleeper sofa, Kilanda dark blue', 'vretstorp-sleeper-sofa-kilanda-dark-blue', 'SP0053', 'VRETSTORP sleeper sofa, Kilanda dark blue This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open....', 'VRETSTORP sleeper sofa, Kilanda dark blue This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open.', 26225000, NULL, 10, 'https://www.ikea.com/us/en/images/products/vretstorp-sleeper-sofa-kilanda-dark-blue__1155335_pe886565_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (54, 60, 'VRETSTORP cover for sleeper sofa, Hakebo dark gray', 'vretstorp-cover-for-sleeper-sofa-hakebo-dark-gray', 'SP0054', 'VRETSTORP cover for sleeper sofa, Hakebo dark gray This cover will make your sofa even more inviting. It is soft and smooth with a slight structure - and the cover is also easy to remove and machine wash if needed....', 'VRETSTORP cover for sleeper sofa, Hakebo dark gray This cover will make your sofa even more inviting. It is soft and smooth with a slight structure - and the cover is also easy to remove and machine wash if needed.', 2475000, NULL, 10, 'https://www.ikea.com/us/en/images/products/vretstorp-cover-for-sleeper-sofa-hakebo-dark-gray__1194800_pe902059_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (55, 49, 'VOXTORP door, matte white, 24x40\"', 'voxtorp-door-matte-white-24x40', 'SP0055', 'VOXTORP door, matte white, 24x40\" VOXTORP fronts with matte white surface create a modern look and give the impression of light and space. Integrated handles blend perfectly into the design enhancing the minimalist expression. The depth of the handle...', 'VOXTORP door, matte white, 24x40\" VOXTORP fronts with matte white surface create a modern look and give the impression of light and space. Integrated handles blend perfectly into the design enhancing the minimalist expression. The depth of the handle makes it easy to open and close the door.', 6775000, NULL, 10, 'https://www.ikea.com/us/en/images/products/voxtorp-door-matte-white__0638953_pe699267_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
@@ -1001,6 +1035,13 @@ ALTER TABLE `order_status`
   ADD KEY `fk_orders_order_status` (`order_id`);
 
 --
+-- Indexes for table `order_status_histories`
+--
+ALTER TABLE `order_status_histories`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `order_status_histories_order_index` (`order_id`);
+
+--
 -- Indexes for table `payments`
 --
 ALTER TABLE `payments`
@@ -1124,7 +1165,7 @@ ALTER TABLE `carts`
 -- AUTO_INCREMENT for table `cart_details`
 --
 ALTER TABLE `cart_details`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
 
 --
 -- AUTO_INCREMENT for table `categories`
@@ -1136,7 +1177,7 @@ ALTER TABLE `categories`
 -- AUTO_INCREMENT for table `comments`
 --
 ALTER TABLE `comments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `discount_types`
@@ -1148,19 +1189,25 @@ ALTER TABLE `discount_types`
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `order_items`
 --
 ALTER TABLE `order_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `order_status`
 --
 ALTER TABLE `order_status`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `order_status_histories`
+--
+ALTER TABLE `order_status_histories`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `payments`
