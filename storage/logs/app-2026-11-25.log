@@ -1,0 +1,1 @@
+[2026-11-25 22:34:20] app.ERROR: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'noi_that_test_2.products' doesn't exist {"exception":"PDOException","file":"D:\\xampp\\htdocs\\du-an-1\\du-an-1-main\\app\\Core\\Database.php:63","url":"GET /"}

@@ -16,28 +16,39 @@
         <div class="empty">Chưa có sản phẩm.</div>
     <?php else: ?>
         <table class="table">
-            <thead><tr><th></th><th>Tên</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th>Trạng thái</th><th></th></tr></thead>
-            <tbody>
-            <?php foreach ($pager['data'] as $p): ?>
+            <thead>
                 <tr>
-                    <td><span class="cart-thumb"><?= $this->insert('partials/product-image', ['product' => $p]) ?></span></td>
-                    <td><strong><?= e($p['name']) ?></strong><br><small class="muted"><?= e($p['sku'] ?? '') ?></small><?= $p['is_featured'] ? ' <span class="pill pill-info">Nổi bật</span>' : '' ?><?= $p['has_variants'] ? ' <span class="pill pill-warning">Có phân loại</span>' : '' ?></td>
-                    <td data-label="Danh mục"><?= e($categories[$p['category_id']] ?? '—') ?></td>
-                    <td data-label="Giá">
-                        <?= $p['has_variants'] ? 'Từ ' : '' ?><?= money(App\Services\PriceCalculator::unitPrice($p)) ?>
-                        <?php if ($p['sale_price']): ?><br><del class="muted"><?= money($p['price']) ?></del><?php endif ?>
-                    </td>
-                    <td data-label="Tồn kho" class="<?= (int) $p['stock'] <= 5 ? 'text-danger' : '' ?>"><?= (int) $p['stock'] ?></td>
-                    <td data-label="Trạng thái"><span class="pill pill-<?= $p['status'] === 'active' ? 'success' : 'warning' ?>"><?= $p['status'] === 'active' ? 'Đang bán' : 'Nháp' ?></span></td>
-                    <td class="actions">
-                        <a class="btn btn-sm btn-ghost" href="<?= url('/admin/products/' . (int) $p['id'] . '/edit') ?>">Sửa</a>
-                        <form action="<?= url('/admin/products/' . (int) $p['id']) ?>" method="post">
-                            <?= csrf_field() ?><?= method_field('DELETE') ?>
-                            <button class="btn btn-sm btn-danger" type="submit" data-confirm="Chuyển sản phẩm này vào thùng rác?">Xoá</button>
-                        </form>
-                    </td>
+                    <th></th>
+                    <th>Tên</th>
+                    <th>Danh mục</th>
+                    <th>Giá</th>
+                    <th>Tồn kho</th>
+                    <th>Trạng thái</th>
+                    <th></th>
                 </tr>
-            <?php endforeach ?>
+            </thead>
+            <tbody>
+                <?php foreach ($pager['data'] as $p): ?>
+                    <tr>
+                        <td><span class="cart-thumb"><?= $this->insert('partials/product-image', ['product' => $p]) ?></span></td>
+                        <td><strong><?= e($p['name']) ?></strong><br><small class="muted"><?= e($p['sku'] ?? '') ?></small><?= $p['is_featured'] ? ' <span class="pill pill-info">Nổi bật</span>' : '' ?><?= $p['has_variants'] ? ' <span class="pill pill-warning">Có phân loại</span>' : '' ?></td>
+                        <td data-label="Danh mục"><?= e($categories[$p['category_id']] ?? '—') ?></td>
+                        <td data-label="Giá">
+                            <?= $p['has_variants'] ? 'Từ ' : '' ?><?= money(App\Services\PriceCalculator::unitPrice($p)) ?>
+                            <?php if ($p['sale_price']): ?><br><del class="muted"><?= money($p['price']) ?></del><?php endif ?>
+                        </td>
+                        <td data-label="Tồn kho" class="<?= (int) $p['stock'] <= 5 ? 'text-danger' : '' ?>"><?= (int) $p['stock'] ?></td>
+                        <td data-label="Trạng thái"><span class="pill pill-<?= $p['status'] === 'active' ? 'success' : 'warning' ?>"><?= $p['status'] === 'active' ? 'Đang bán' : 'Nháp' ?></span></td>
+                        <td class="actions">
+                            <a class="btn btn-sm btn-ghost" href="<?= url('/admin/products/' . (int) $p['id'] . '/edit') ?>">Sửa</a>
+                            <a class="btn btn-sm btn-ghost" href="<?= url('/admin/products/' . (int) $p['id'] . '/edit#product-variants-manager') ?>">Biến thể</a>
+                            <form action="<?= url('/admin/products/' . (int) $p['id']) ?>" method="post">
+                                <?= csrf_field() ?><?= method_field('DELETE') ?>
+                                <button class="btn btn-sm btn-danger" type="submit" data-confirm="Chuyển sản phẩm này vào thùng rác?">Xoá</button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach ?>
             </tbody>
         </table>
         <?= $this->insert('partials/pagination', ['pager' => $pager]) ?>
