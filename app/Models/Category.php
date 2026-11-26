@@ -87,4 +87,18 @@ final class Category extends Model
     {
         return str_ends_with($value, $suffix) ? substr($value, 0, -strlen($suffix)) : $value;
     }
+
+    /**
+     * Xoá vĩnh viễn danh mục, gỡ liên kết trong product_categories và đưa sản phẩm / danh mục con về không danh mục.
+     */
+    public static function forceDeleteById(int $id): int
+    {
+        return (int) self::db()->transaction(static function ($db) use ($id): int {
+            $db->delete('product_categories', 'category_id = ?', [$id]);
+            $db->update('products', ['category_id' => null], 'category_id = ?', [$id]);
+            $db->update('categories', ['parent_id' => null], 'parent_id = ?', [$id]);
+
+            return parent::forceDeleteById($id);
+        });
+    }
 }

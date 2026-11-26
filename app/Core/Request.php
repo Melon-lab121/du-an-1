@@ -73,7 +73,7 @@ final class Request
             $base = '';
         }
 
-        $inside = static fn (string $b): bool => $b === '' || $uri === $b || str_starts_with($uri, $b . '/');
+        $inside = static fn(string $b): bool => $b === '' || $uri === $b || str_starts_with($uri, $b . '/');
 
         if (!$inside($base) && str_ends_with($base, '/public')) {
             $base = substr($base, 0, -strlen('/public'));
@@ -184,6 +184,12 @@ final class Request
             return null;
         }
         return $file;
+    }
+
+    /** @return array<string, mixed> toàn bộ mảng file upload */
+    public function files(): array
+    {
+        return $this->files;
     }
 
     public function cookie(string $key, mixed $default = null): mixed

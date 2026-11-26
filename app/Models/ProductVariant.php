@@ -6,27 +6,64 @@ namespace App\Models;
 
 use App\Core\Model;
 
-/**
- * Biến thể (1 tổ hợp giá trị thuộc tính = 1 SKU). Xoá mềm: biến thể bị bỏ khỏi tổ hợp vẫn còn trong DB
- * để đơn hàng cũ trỏ tới được, và tự khôi phục nếu admin thêm lại đúng tổ hợp đó.
- */
 final class ProductVariant extends Model
 {
     protected static string $table = 'product_variants';
+    protected static string $primaryKey = 'id';
+    protected static bool $timestamps = true;
     protected static bool $softDeletes = true;
-    protected static array $fillable = ['product_id', 'option_key', 'title', 'sku', 'price', 'sale_price', 'stock'];
 
-    /** @return array<int, array<string, mixed>> biến thể đang bán của 1 sản phẩm */
-    public static function forProduct(int $productId): array
-    {
-        return self::query()->where('product_id', $productId)->orderBy('id')->get();
-    }
+    protected static array $fillable = [
+        'product_id',
+        'option_key',
+        'title',
+        'sku',
+        'price',
+        'sale_price',
+        'stock',
+        'product_status_id',
+        'image',
+        'deleted_at',
+    ];
 
-    /** Khoá chuẩn của tổ hợp: id giá trị sắp xếp tăng dần, nối bằng "-". @param int[] $valueIds */
+    /**
+     * Tạo khoá tổ hợp chuẩn hoá từ danh sách option_value_id.
+     * Sắp xếp tăng dần để đảm bảo thứ tự luôn nhất quán giữa sync() và findByValues().
+     *
+     * @param int[] $valueIds
+     */
     public static function keyOf(array $valueIds): string
     {
-        $ids = array_map('intval', $valueIds);
-        sort($ids);
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $valueIds),
+            static fn (int $id): bool => $id > 0,
+        )));
+        sort($ids, SORT_NUMERIC);
+
         return implode('-', $ids);
+    }
+
+    /**
+     * Lấy danh sách biến thể đang hoạt động của một sản phẩm.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function forProduct(int $productId): array
+    {
+        return static::db()->select(
+            'SELECT id, product_id, option_key, title, sku, price, sale_price, stock, product_status_id, image, created_at, updated_at, deleted_at
+             FROM product_variants
+             WHERE product_id = ? AND deleted_at IS NULL
+             ORDER BY id ASC',
+            [$productId],
+        );
+    }
+
+    /**
+     * Xoá mềm biến thể theo id (trả về số dòng bị ảnh hưởng, đồng nhất với Model).
+     */
+    public static function deleteById(int $id): int
+    {
+        return parent::deleteById($id);
     }
 }

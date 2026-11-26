@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use DomainException;
 use InvalidArgumentException;
+use Throwable;
 
 /**
  * Nghiệp vụ đơn hàng. Event phát ra (module có thể lắng nghe):
@@ -35,59 +36,71 @@ final class OrderService
      *
      * @param array{name: string, email: string, phone: string, address: string, note?: ?string} $customer
      * @param array<int|string, int> $items [khoá dòng giỏ => quantity], khoá = "product_id" hoặc "product_id:variant_id"
-     *                                      (xem CartService::key())
      * @return array<string, mixed> đơn hàng vừa tạo
      */
     public function place(array $customer, array $items, string $paymentMethod, ?int $userId = null): array
     {
-        $items = array_filter($items, fn (int $qty): bool => $qty > 0);
+        $items = array_filter($items, static fn (int $qty): bool => $qty > 0);
         if ($items === []) {
             throw new DomainException('Giỏ hàng đang trống.');
         }
 
-        // Sắp xếp thứ tự key sản phẩm trước khi khoá kho để chống Deadlock
+        // Sắp xếp thứ tự khoá trước khi khoá kho để chống deadlock
         ksort($items);
 
         [$order, $lines] = $this->db->transaction(function (Database $db) use ($customer, $items, $paymentMethod, $userId): array {
             $lines = [];
+
             foreach ($items as $key => $qty) {
                 [$productId, $variantId] = CartService::parseKey($key);
-                // Product::active() đã lọc deleted_at IS NULL: sản phẩm vừa bị xoá mềm không đặt được
                 $product = Product::active()->where('id', $productId)->first();
                 if ($product === null) {
                     throw new DomainException('Có sản phẩm trong giỏ đã ngừng bán, vui lòng kiểm tra lại giỏ hàng.');
                 }
 
-                if ((int) $product['has_variants'] || $variantId !== null) {
+                if ((int) ($product['has_variants'] ?? 0) || $variantId !== null) {
                     $lines[] = $this->takeVariant($db, $product, $variantId, $qty);
                     continue;
                 }
 
-                // Trừ kho nguyên tử: chỉ thành công khi còn đủ hàng (an toàn khi nhiều người mua cùng lúc)
                 $affected = $db->query(
                     'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ? AND deleted_at IS NULL',
                     [$qty, $productId, $qty],
                 )->rowCount();
+
                 if ($affected === 0) {
-                    throw new DomainException(sprintf('Sản phẩm "%s" không đủ hàng (còn %d).', $product['name'], (int) $product['stock']));
+                    throw new DomainException(sprintf(
+                        'Sản phẩm "%s" không đủ hàng (còn %d).',
+                        (string) $product['name'],
+                        (int) ($product['stock'] ?? 0),
+                    ));
                 }
 
-                $price = PriceCalculator::unitPrice($product);
+                $price = (int) PriceCalculator::unitPrice($product);
                 $lines[] = [
                     'product_id' => (int) $product['id'],
                     'variant_id' => null,
                     'product_name' => (string) $product['name'],
                     'variant_label' => null,
-                    'sku' => $product['sku'],
+                    'sku' => $product['sku'] ?? null,
                     'price' => $price,
                     'quantity' => $qty,
                     'total' => $price * $qty,
                 ];
             }
 
-            $subtotal = array_sum(array_column($lines, 'total'));
-            $discount = (int) $this->events->filter('order.discount', 0, ['lines' => $lines, 'subtotal' => $subtotal, 'customer' => $customer, 'userId' => $userId]);
-            $voucherCode = (string) $this->events->filter('order.voucher_code', '', ['customer' => $customer, 'userId' => $userId]);
+            $subtotal = (int) array_sum(array_column($lines, 'total'));
+            $discount = (int) $this->events->filter('order.discount', 0, [
+                'lines' => $lines,
+                'subtotal' => $subtotal,
+                'customer' => $customer,
+                'userId' => $userId,
+            ]);
+            $voucherCode = (string) $this->events->filter('order.voucher_code', '', [
+                'customer' => $customer,
+                'userId' => $userId,
+            ]);
+
             $totals = PriceCalculator::totals(
                 $lines,
                 (int) $this->config->get('shop.shipping_fee', 0),
@@ -125,9 +138,10 @@ final class OrderService
 
         try {
             $this->events->dispatch('order.created', ['order' => $order, 'items' => $lines]);
-        } catch (\Throwable) {
-            // Không để lỗi từ event listener làm hỏng đơn đã commit
+        } catch (Throwable) {
+            // Không để lỗi từ listener làm hỏng đơn đã commit
         }
+
         return $order;
     }
 
@@ -135,8 +149,8 @@ final class OrderService
     public function markPaid(int $orderId): bool
     {
         $order = Order::find($orderId);
-        if ($order && (string) $order['status'] === 'cancelled') {
-            return false; // Không ghi nhận thanh toán cho đơn đã bị huỷ
+        if ($order && (string) ($order['status'] ?? '') === 'cancelled') {
+            return false;
         }
 
         $now = date('Y-m-d H:i:s');
@@ -148,10 +162,10 @@ final class OrderService
         ) > 0;
 
         if ($changed) {
-            // Đơn online đã thanh toán => tự xác nhận
             $this->db->update('orders', ['status' => 'confirmed'], 'id = ? AND status = ?', [$orderId, 'pending']);
             $this->events->dispatch('order.paid', ['order' => Order::find($orderId)]);
         }
+
         return $changed;
     }
 
@@ -192,12 +206,10 @@ final class OrderService
             $now = date('Y-m-d H:i:s');
             $updateData = ['status' => $status, 'updated_at' => $now];
 
-            // Nếu đơn COD giao thành công: tự động đánh dấu đã thanh toán
             if ($status === 'completed' && ($order['payment_method'] ?? '') === 'cod' && ($order['payment_status'] ?? '') !== 'paid') {
                 $updateData['payment_status'] = 'paid';
                 $updateData['paid_at'] = $now;
             }
-            // Nếu huỷ đơn đã trả tiền: chuyển sang hoàn tiền (refunded)
             if ($status === 'cancelled' && ($order['payment_status'] ?? '') === 'paid') {
                 $updateData['payment_status'] = 'refunded';
             }
@@ -205,20 +217,29 @@ final class OrderService
             $db->update('orders', $updateData, 'id = ?', [$orderId]);
 
             if ($status === 'cancelled') {
-                // Hoàn kho cả khi sản phẩm/biến thể đang nằm thùng rác (khôi phục thì số tồn vẫn đúng)
                 foreach (Order::items($orderId) as $item) {
                     if ($item['variant_id'] !== null) {
-                        $db->query('UPDATE product_variants SET stock = stock + ? WHERE id = ?', [(int) $item['quantity'], (int) $item['variant_id']]);
+                        $db->query(
+                            'UPDATE product_variants SET stock = stock + ? WHERE id = ?',
+                            [(int) $item['quantity'], (int) $item['variant_id']],
+                        );
                         if ($item['product_id'] !== null) {
                             $this->variants->refreshSummary((int) $item['product_id']);
                         }
                     } elseif ($item['product_id'] !== null) {
-                        $db->query('UPDATE products SET stock = stock + ? WHERE id = ?', [(int) $item['quantity'], (int) $item['product_id']]);
+                        $db->query(
+                            'UPDATE products SET stock = stock + ? WHERE id = ?',
+                            [(int) $item['quantity'], (int) $item['product_id']],
+                        );
                     }
                 }
             }
 
-            $this->events->dispatch('order.status_changed', ['order' => Order::find($orderId), 'from' => $from, 'to' => $status]);
+            $this->events->dispatch('order.status_changed', [
+                'order' => Order::find($orderId),
+                'from' => $from,
+                'to' => $status,
+            ]);
         });
     }
 
@@ -230,30 +251,42 @@ final class OrderService
      */
     private function takeVariant(Database $db, array $product, ?int $variantId, int $qty): array
     {
-        if ($variantId === null || !(int) $product['has_variants']) {
-            throw new DomainException(sprintf('Vui lòng chọn lại phân loại cho "%s".', $product['name']));
+        if ($variantId === null || !(int) ($product['has_variants'] ?? 0)) {
+            throw new DomainException(sprintf('Vui lòng chọn lại phân loại cho "%s".', (string) $product['name']));
         }
-        $variant = ProductVariant::query()->where('id', $variantId)->where('product_id', (int) $product['id'])->first();
+
+        $variant = ProductVariant::query()
+            ->where('id', $variantId)
+            ->where('product_id', (int) $product['id'])
+            ->first();
+
         if ($variant === null) {
-            throw new DomainException(sprintf('Phân loại của "%s" trong giỏ đã ngừng bán.', $product['name']));
+            throw new DomainException(sprintf('Phân loại của "%s" trong giỏ đã ngừng bán.', (string) $product['name']));
         }
 
         $affected = $db->query(
             'UPDATE product_variants SET stock = stock - ? WHERE id = ? AND stock >= ? AND deleted_at IS NULL',
             [$qty, $variantId, $qty],
         )->rowCount();
-        if ($affected === 0) {
-            throw new DomainException(sprintf('"%s – %s" không đủ hàng (còn %d).', $product['name'], $variant['title'], (int) $variant['stock']));
-        }
-        $this->variants->refreshSummary((int) $product['id']); // products.stock = tổng tồn các biến thể
 
-        $price = PriceCalculator::unitPrice($variant);
+        if ($affected === 0) {
+            throw new DomainException(sprintf(
+                '"%s – %s" không đủ hàng (còn %d).',
+                (string) $product['name'],
+                (string) $variant['title'],
+                (int) ($variant['stock'] ?? 0),
+            ));
+        }
+
+        $this->variants->refreshSummary((int) $product['id']);
+
+        $price = (int) PriceCalculator::unitPrice($variant);
         return [
             'product_id' => (int) $product['id'],
             'variant_id' => $variantId,
             'product_name' => (string) $product['name'],
             'variant_label' => (string) $variant['title'],
-            'sku' => $variant['sku'] ?? $product['sku'],
+            'sku' => $variant['sku'] ?? ($product['sku'] ?? null),
             'price' => $price,
             'quantity' => $qty,
             'total' => $price * $qty,
@@ -265,6 +298,7 @@ final class OrderService
         do {
             $code = 'DH' . date('ymd') . strtoupper(bin2hex(random_bytes(3)));
         } while ($this->db->table('orders')->where('code', $code)->exists());
+
         return $code;
     }
 }
