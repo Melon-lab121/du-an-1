@@ -233,8 +233,22 @@ final class Request
     public function isSecure(): bool
     {
         $https = strtolower((string) ($this->server['HTTPS'] ?? ''));
-        return ($https !== '' && $https !== 'off')
-            || strtolower((string) ($this->server['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+        if ($https !== '' && $https !== 'off') {
+            return true;
+        }
+
+        $ip = (string) ($this->server['REMOTE_ADDR'] ?? '127.0.0.1');
+        $ip = $ip === '::1' ? '127.0.0.1' : $ip;
+        if ($ip === '127.0.0.1' && Env::get('TRUST_PROXY', false) === true) {
+            if (strtolower((string) ($this->server['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https') {
+                return true;
+            }
+            if (str_contains(strtolower((string) ($this->server['HTTP_CF_VISITOR'] ?? '')), '"https"')) {
+                return true;
+            }
+        }
+
+        return strtolower((string) ($this->server['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
     }
 
     public function host(): string

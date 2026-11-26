@@ -7,23 +7,39 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\Request;
 use App\Core\Response;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Services\Auth;
 use App\Services\CartService;
+use App\Services\OrderService;
+use App\Services\PriceCalculator;
 use App\Services\VariantService;
+use App\Services\VoucherService;
 use DomainException;
 
 final class CartController extends Controller
 {
-    public function __construct(private CartService $cart, private VariantService $variants)
-    {
+    public function __construct(
+        private CartService $cart,
+        private VariantService $variants,
+        private VoucherService $vouchers,
+        private Auth $auth,
+    ) {
     }
 
     public function index(): Response
     {
         $lines = $this->cart->lines();
+        $user = $this->auth->user();
+        $userId = $this->auth->id();
+        $email = $user['email'] ?? null;
+        $phone = $user['phone'] ?? null;
 
         return $this->view('cart/index', [
             'lines' => $lines,
             'totals' => $this->cart->totals($lines),
+            'availableVouchers' => $this->vouchers->availableForCart($lines, $userId, $email, $phone),
+            'appliedVoucher' => $this->vouchers->applied($lines, $userId, $email, $phone),
         ]);
     }
 
@@ -57,10 +73,17 @@ final class CartController extends Controller
 
         $buyNow = !empty($request->input('buy_now'));
 
+        $unitPrice = $this->resolveUnitPrice($productId, $variantId);
+        $key = CartService::key($productId, $variantId);
+        $existingQty = (int) (($this->cart->raw()[$key] ?? 0));
+        if ($unitPrice >= OrderService::HIGH_VALUE_THRESHOLD && ($existingQty + $quantity) > OrderService::HIGH_VALUE_MAX_QTY) {
+            $msg = 'Sản phẩm có giá từ 10.000.000 ₫ trở lên chỉ được mua tối đa ' . OrderService::HIGH_VALUE_MAX_QTY . ' cái mỗi đơn.';
+            return $this->respond($request, false, $msg);
+        }
+
         try {
             $this->cart->add($productId, $quantity, $variantId);
         } catch (DomainException $e) {
-            $key = CartService::key($productId, $variantId);
             if ($buyNow && isset($this->cart->raw()[$key])) {
                 return $this->respond($request, true, 'Chuyển sang thanh toán.');
             }
@@ -80,8 +103,16 @@ final class CartController extends Controller
                 if ($itemKey === '') {
                     continue;
                 }
+                $targetQty = (int) $qty;
+                if ($targetQty > 0) {
+                    [$pid, $vid] = CartService::parseKey($itemKey);
+                    $unitPrice = $this->resolveUnitPrice($pid, $vid);
+                    if ($unitPrice >= OrderService::HIGH_VALUE_THRESHOLD && $targetQty > OrderService::HIGH_VALUE_MAX_QTY) {
+                        $targetQty = OrderService::HIGH_VALUE_MAX_QTY;
+                    }
+                }
                 try {
-                    $this->cart->update($itemKey, (int) $qty);
+                    $this->cart->update($itemKey, $targetQty);
                 } catch (DomainException) {
                     $this->cart->remove($itemKey);
                 }
@@ -99,6 +130,22 @@ final class CartController extends Controller
         }
 
         return $this->respond($request, true, 'Đã xoá sản phẩm khỏi giỏ.');
+    }
+
+    private function resolveUnitPrice(int $productId, ?int $variantId): int
+    {
+        if ($variantId !== null) {
+            $variant = ProductVariant::query()
+                ->where('id', $variantId)
+                ->where('product_id', $productId)
+                ->first();
+            if ($variant !== null) {
+                return (int) PriceCalculator::unitPrice($variant);
+            }
+        }
+
+        $product = Product::query()->where('id', $productId)->first();
+        return $product !== null ? (int) PriceCalculator::unitPrice($product) : 0;
     }
 
     /** AJAX => JSON, form thường => redirect kèm flash */

@@ -23,6 +23,9 @@ use Throwable;
  */
 final class OrderService
 {
+    public const HIGH_VALUE_THRESHOLD = 10000000;
+    public const HIGH_VALUE_MAX_QTY = 3;
+
     public function __construct(
         private Database $db,
         private Events $events,
@@ -63,6 +66,15 @@ final class OrderService
                     continue;
                 }
 
+                $price = (int) PriceCalculator::unitPrice($product);
+                if ($price >= self::HIGH_VALUE_THRESHOLD && $qty > self::HIGH_VALUE_MAX_QTY) {
+                    throw new DomainException(sprintf(
+                        'Sản phẩm "%s" có giá từ 10.000.000 ₫ trở lên chỉ được mua tối đa %d cái mỗi đơn.',
+                        (string) $product['name'],
+                        self::HIGH_VALUE_MAX_QTY,
+                    ));
+                }
+
                 $affected = $db->query(
                     'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ? AND deleted_at IS NULL',
                     [$qty, $productId, $qty],
@@ -76,7 +88,6 @@ final class OrderService
                     ));
                 }
 
-                $price = (int) PriceCalculator::unitPrice($product);
                 $lines[] = [
                     'product_id' => (int) $product['id'],
                     'variant_id' => null,
@@ -109,6 +120,8 @@ final class OrderService
             );
 
             $now = date('Y-m-d H:i:s');
+            $initialStatus = strtolower($paymentMethod) !== 'cod' ? 'confirmed' : 'pending';
+
             $orderId = $db->insert('orders', [
                 'code' => $this->generateCode(),
                 'user_id' => $userId,
@@ -124,7 +137,9 @@ final class OrderService
                 'total' => $totals['total'],
                 'payment_method' => $paymentMethod,
                 'payment_status' => 'unpaid',
-                'status' => 'pending',
+                'status' => $initialStatus,
+                'shipping_attempts' => 0,
+                'refund_status' => 'none',
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -183,40 +198,94 @@ final class OrderService
         }
     }
 
-    /** Đổi trạng thái đơn; huỷ đơn sẽ hoàn lại tồn kho. */
-    public function updateStatus(int $orderId, string $status): void
+    /**
+     * Đổi trạng thái đơn theo luồng (phía quản trị / hệ thống):
+     * - Không cho tự chuyển sang 'completed' (chỉ khách xác nhận nhận hàng hoặc tự động sau 2 tuần không trả hàng).
+     * - Không quay lại trạng thái trước đó.
+     * - Đơn online bắt đầu từ 'confirmed'.
+     * - Hủy đơn chỉ được phép trước khi giao tới đơn vị vận chuyển; hủy đơn sẽ hoàn lại tồn kho.
+     * - Giao đơn vị vận chuyển tối đa 3 lần.
+     */
+    public function updateStatus(int $orderId, string $status, bool $carrierFailed = false): void
     {
         if (!array_key_exists($status, Order::STATUSES)) {
             throw new InvalidArgumentException('Trạng thái không hợp lệ.');
         }
 
-        $this->db->transaction(function (Database $db) use ($orderId, $status): void {
+        $this->db->transaction(function (Database $db) use ($orderId, $status, $carrierFailed): void {
             $order = $db->table('orders')->find($orderId) ?? throw new DomainException('Không tìm thấy đơn hàng.');
             $from = (string) $order['status'];
-            if ($from === $status) {
-                return;
+            $attempts = (int) ($order['shipping_attempts'] ?? 0);
+
+            if ($status === 'completed') {
+                throw new DomainException('Trạng thái Hoàn thành chỉ có khi khách xác nhận đã nhận hàng hoặc tự động sau 2 tuần không trả hàng.');
             }
-            if ($from === 'cancelled') {
-                throw new DomainException('Đơn đã huỷ, không thể đổi trạng thái.');
+
+            if (in_array($from, ['cancelled', 'completed'], true)) {
+                throw new DomainException('Đơn hàng đã kết thúc, không thể thay đổi trạng thái.');
             }
-            if ($from === 'completed' && $status !== 'cancelled') {
-                throw new DomainException('Đơn đã hoàn thành, không thể chuyển ngược trạng thái.');
+
+            if ($status === 'pending') {
+                throw new DomainException('Không thể chuyển về trạng thái Chờ xác nhận.');
+            }
+
+            if (Order::isOnlineMethod($order) && $from === 'pending' && $status !== 'confirmed' && $status !== 'cancelled') {
+                throw new DomainException('Đơn thanh toán online bắt đầu từ trạng thái Đã xác nhận đơn hàng.');
+            }
+
+            $fromRank = Order::LINEAR_ORDER[$from] ?? 0;
+            $toRank = Order::LINEAR_ORDER[$status] ?? 0;
+            if ($fromRank > 0 && $toRank > 0 && $toRank < $fromRank) {
+                throw new DomainException('Không thể quay lại trạng thái trước đó.');
+            }
+
+            if ($status === 'cancelled' && $fromRank >= Order::LINEAR_ORDER['shipping']) {
+                throw new DomainException('Chỉ có thể hủy đơn trước khi đưa hàng tới đơn vị vận chuyển.');
             }
 
             $now = date('Y-m-d H:i:s');
-            $updateData = ['status' => $status, 'updated_at' => $now];
+            $updateData = ['updated_at' => $now];
+            $targetStatus = $status;
 
-            if ($status === 'completed' && ($order['payment_method'] ?? '') === 'cod' && ($order['payment_status'] ?? '') !== 'paid') {
-                $updateData['payment_status'] = 'paid';
-                $updateData['paid_at'] = $now;
+            // Xử lý giao tới đơn vị vận chuyển (tối đa 3 lần)
+            if ($status === 'shipping' || ($from === 'shipping' && $carrierFailed)) {
+                if ($attempts >= Order::MAX_SHIPPING_ATTEMPTS) {
+                    throw new DomainException('Đã đạt tối đa ' . Order::MAX_SHIPPING_ATTEMPTS . ' lần giao tới đơn vị vận chuyển.');
+                }
+
+                $nextAttempt = $attempts + 1;
+                $updateData['shipping_attempts'] = $nextAttempt;
+                $updateData['shipped_at'] = $order['shipped_at'] ?? $now;
+
+                if ($carrierFailed && $nextAttempt >= Order::MAX_SHIPPING_ATTEMPTS) {
+                    $targetStatus = 'delivery_failed';
+                } else {
+                    $targetStatus = 'shipping';
+                }
             }
-            if ($status === 'cancelled' && ($order['payment_status'] ?? '') === 'paid') {
-                $updateData['payment_status'] = 'refunded';
+
+            $updateData['status'] = $targetStatus;
+
+            if ($targetStatus === 'delivered') {
+                $updateData['delivered_at'] = $now;
+            }
+
+            if (in_array($targetStatus, ['cancelled', 'delivery_failed', 'returned'], true)) {
+                if ($targetStatus === 'cancelled') {
+                    $updateData['cancelled_at'] = $now;
+                }
+                if (Order::isOnlineMethod($order) && (($order['payment_status'] ?? '') === 'paid')) {
+                    $updateData['refund_status'] = 'pending_refund';
+                }
+            }
+
+            if ($from === $targetStatus && ($updateData['shipping_attempts'] ?? null) === null) {
+                return;
             }
 
             $db->update('orders', $updateData, 'id = ?', [$orderId]);
 
-            if ($status === 'cancelled') {
+            if ($targetStatus === 'cancelled') {
                 foreach (Order::items($orderId) as $item) {
                     if ($item['variant_id'] !== null) {
                         $db->query(
@@ -235,11 +304,13 @@ final class OrderService
                 }
             }
 
-            $this->events->dispatch('order.status_changed', [
-                'order' => Order::find($orderId),
-                'from' => $from,
-                'to' => $status,
-            ]);
+            if ($from !== $targetStatus) {
+                $this->events->dispatch('order.status_changed', [
+                    'order' => Order::find($orderId),
+                    'from' => $from,
+                    'to' => $targetStatus,
+                ]);
+            }
         });
     }
 
@@ -264,6 +335,16 @@ final class OrderService
             throw new DomainException(sprintf('Phân loại của "%s" trong giỏ đã ngừng bán.', (string) $product['name']));
         }
 
+        $price = (int) PriceCalculator::unitPrice($variant);
+        if ($price >= self::HIGH_VALUE_THRESHOLD && $qty > self::HIGH_VALUE_MAX_QTY) {
+            throw new DomainException(sprintf(
+                '"%s – %s" có giá từ 10.000.000 ₫ trở lên chỉ được mua tối đa %d cái mỗi đơn.',
+                (string) $product['name'],
+                (string) $variant['title'],
+                self::HIGH_VALUE_MAX_QTY,
+            ));
+        }
+
         $affected = $db->query(
             'UPDATE product_variants SET stock = stock - ? WHERE id = ? AND stock >= ? AND deleted_at IS NULL',
             [$qty, $variantId, $qty],
@@ -280,7 +361,6 @@ final class OrderService
 
         $this->variants->refreshSummary((int) $product['id']);
 
-        $price = (int) PriceCalculator::unitPrice($variant);
         return [
             'product_id' => (int) $product['id'],
             'variant_id' => $variantId,

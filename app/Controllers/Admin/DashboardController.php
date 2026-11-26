@@ -18,14 +18,11 @@ final class DashboardController extends Controller
 
     public function index(Request $request): Response
     {
+        Order::autoCompleteExpired();
+
         $orderStatus = (string) $request->query('order_status', '');
         if (!isset(Order::STATUSES[$orderStatus])) {
             $orderStatus = '';
-        }
-
-        $staffSort = (string) $request->query('staff_sort', 'revenue_desc');
-        if (!isset(DashboardStats::STAFF_SORTS[$staffSort])) {
-            $staffSort = 'revenue_desc';
         }
 
         $productSort = (string) $request->query('product_sort', 'sold_desc');
@@ -42,13 +39,13 @@ final class DashboardController extends Controller
             'stats' => $this->stats->summary(),
             'chart' => $this->stats->lastDaysSeries(7),
             'orderStatus' => $orderStatus,
-            'staffSort' => $staffSort,
             'productSort' => $productSort,
             'stock' => $stock,
             'statusCounts' => $this->stats->orderStatusCounts(),
             'filteredOrderCount' => $this->stats->orderCount($orderStatus),
             'filteredOrders' => $this->stats->ordersByStatus($orderStatus),
-            'staffRows' => $this->stats->staffByRevenue($staffSort),
+            'recentReturns' => $this->stats->recentReturns(10),
+            'mergeGroups' => $this->stats->mergeGroups(20),
             'productRows' => $this->stats->productsFiltered($productSort, $stock),
         ]);
     }

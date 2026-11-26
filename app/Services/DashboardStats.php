@@ -11,15 +11,10 @@ use App\Models\User;
 use DateTimeImmutable;
 
 /**
- * Số liệu trang tổng quan admin: thống kê, biểu đồ 7 ngày và bộ lọc.
+ * Số liệu trang tổng quan admin: thống kê, biểu đồ 7 ngày, lượt trả hàng, gợi ý gom đơn và bộ lọc.
  */
 final class DashboardStats
 {
-    public const STAFF_SORTS = [
-        'revenue_desc' => 'Doanh số cao nhất',
-        'revenue_asc' => 'Doanh số thấp nhất',
-    ];
-
     public const PRODUCT_SORTS = [
         'sold_desc' => 'Lượt mua nhiều nhất',
         'sold_asc' => 'Lượt mua ít nhất',
@@ -150,34 +145,50 @@ final class DashboardStats
     }
 
     /**
-     * Nhân viên (admin, staff) xếp theo doanh số đơn đã thanh toán gắn với tài khoản.
+     * Lượt trả hàng gần đây để CSKH và quản trị theo dõi.
      *
-     * @return array<int, array{id: int, name: string, email: string, role: string, revenue: int, order_count: int}>
+     * @return array<int, array<string, mixed>>
      */
-    public function staffByRevenue(string $sort): array
+    public function recentReturns(int $limit = 10): array
     {
-        $direction = $sort === 'revenue_asc' ? 'ASC' : 'DESC';
-        $rows = $this->db->select(
-            "SELECT u.id, u.name, u.email, u.role,
-                    COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total ELSE 0 END), 0) AS revenue,
-                    COUNT(o.id) AS order_count
-             FROM users u
-             LEFT JOIN orders o ON o.user_id = u.id
-             WHERE u.role IN ('admin', 'staff')
-             GROUP BY u.id, u.name, u.email, u.role
-             ORDER BY revenue {$direction}, u.name ASC",
+        return $this->db->select(
+            "SELECT r.*, o.code AS order_code, o.customer_name, o.customer_phone
+             FROM order_returns r
+             INNER JOIN orders o ON o.id = r.order_id
+             ORDER BY r.id DESC
+             LIMIT ?",
+            [max(1, $limit)],
         );
+    }
 
-        return array_map(static function (array $row): array {
-            return [
-                'id' => (int) $row['id'],
-                'name' => (string) $row['name'],
-                'email' => (string) $row['email'],
-                'role' => (string) $row['role'],
-                'revenue' => (int) $row['revenue'],
-                'order_count' => (int) $row['order_count'],
-            ];
-        }, $rows);
+    /**
+     * Tìm các khách hàng mua cùng một sản phẩm (và biến thể nếu có) trên nhiều đơn chưa kết thúc
+     * để CSKH liên hệ gom đơn.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function mergeGroups(int $limit = 20): array
+    {
+        return $this->db->select(
+            "SELECT o.customer_phone,
+                    MAX(o.customer_name) AS customer_name,
+                    oi.product_id,
+                    oi.variant_id,
+                    MAX(oi.product_name) AS product_name,
+                    MAX(oi.variant_label) AS variant_label,
+                    COUNT(DISTINCT o.id) AS order_count,
+                    SUM(oi.quantity) AS total_qty,
+                    GROUP_CONCAT(DISTINCT o.code ORDER BY o.id DESC SEPARATOR ', ') AS order_codes
+             FROM orders o
+             INNER JOIN order_items oi ON oi.order_id = o.id
+             WHERE o.status NOT IN ('cancelled', 'completed', 'returned', 'delivery_failed')
+               AND TRIM(COALESCE(o.customer_phone, '')) <> ''
+             GROUP BY o.customer_phone, oi.product_id, COALESCE(oi.variant_id, 0)
+             HAVING COUNT(DISTINCT o.id) >= 2
+             ORDER BY order_count DESC, MAX(o.id) DESC
+             LIMIT ?",
+            [max(1, $limit)],
+        );
     }
 
     /**

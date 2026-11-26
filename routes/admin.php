@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use App\Controllers\Admin\CategoryController;
+use App\Controllers\Admin\CommentController;
 use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\OrderController;
 use App\Controllers\Admin\ProductController;
+use App\Controllers\Admin\UserController;
 use App\Controllers\Admin\VoucherController;
-use App\Controllers\Admin\CommentController;
 use App\Core\Router;
 
 return function (Router $router): void {
@@ -33,14 +34,10 @@ return function (Router $router): void {
         $r->post('/products/{id:\d+}/variants/{variantId}/delete', [ProductController::class, 'softDeleteVariant']);
         $r->post('/products/{id:\d+}/variants/{variantId}/restore', [ProductController::class, 'restoreVariant']);
         $r->get('/products/{id}/variants/trash', [ProductController::class, 'variantsTrash']);
-        $r->post('/products/{id:\d+}/variants/{variantId}/quick-update', [ProductController::class, 'quickUpdateVariant']);
-        $r->post('/products/{id:\d+}/variants/{variantId}/force-delete', [ProductController::class, 'forceDeleteVariant']);
-        $r->post('/products/{id:\d+}/variants/{variantId}/delete', [ProductController::class, 'softDeleteVariant']);
-        $r->post('/products/{id:\d+}/variants/{variantId}/restore', [ProductController::class, 'restoreVariant']);
 
-        $r->get('/comments', [CommentController::class, 'index'])->name('admin.comments.index');
-        $r->post('/comments/{id:\d+}/toggle', [CommentController::class, 'toggleStatus'])->name('admin.comments.toggle');
-        $r->post('/comments/{id:\d+}/delete', [CommentController::class, 'destroy'])->name('admin.comments.destroy');
+        $r->get('/comments', [CommentController::class, 'index'])->name('comments.index');
+        $r->post('/comments/{id:\d+}/toggle', [CommentController::class, 'toggleStatus'])->name('comments.toggle');
+        $r->post('/comments/{id:\d+}/delete', [CommentController::class, 'destroy'])->name('comments.destroy');
 
         $r->get('/categories', [CategoryController::class, 'index'])->name('categories.index');
         $r->post('/categories', [CategoryController::class, 'store'])->name('categories.store');
@@ -53,7 +50,14 @@ return function (Router $router): void {
         $r->get('/orders', [OrderController::class, 'index'])->name('orders.index');
         $r->get('/orders/{id:\d+}', [OrderController::class, 'show'])->name('orders.show');
         $r->post('/orders/{id:\d+}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
+        $r->post('/orders/{id:\d+}/refund', [OrderController::class, 'confirmRefund'])->name('orders.refund');
         $r->post('/orders/{id:\d+}/payments/{paymentId:\d+}/reconcile', [OrderController::class, 'reconcile'])->name('orders.reconcile');
+
+        // Quản lý User
+        $r->get('/users', [UserController::class, 'index'])->name('users.index');
+        $r->get('/users/{id:\d+}/orders', [UserController::class, 'orders'])->name('users.orders');
+        $r->post('/users/{id:\d+}/role', [UserController::class, 'updateRole'])->name('users.role');
+        $r->post('/users/{id:\d+}/delete', [UserController::class, 'destroy'])->name('users.delete');
 
         // Quản lý Voucher
         $r->get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');

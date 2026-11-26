@@ -1,0 +1,5 @@
+[2026-11-24 12:39:00] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'base_shop' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}
+[2026-11-24 12:39:05] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'base_shop' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}
+[2026-11-24 12:39:52] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'base_shop' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}
+[2026-11-24 12:39:53] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'base_shop' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}
+[2026-11-24 12:39:53] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'base_shop' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}

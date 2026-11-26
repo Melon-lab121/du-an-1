@@ -62,12 +62,27 @@ if (!function_exists('url')) {
 }
 
 if (!function_exists('absolute_url')) {
-    /** URL tuyệt đối dựa trên APP_URL (dùng cho email, cổng thanh toán...). Giữ nguyên nếu đã là URL tuyệt đối. */
+    /** URL tuyệt đối dựa trên request hiện tại (Cloudflare/domain) hoặc fallback APP_URL. Giữ nguyên nếu đã là URL tuyệt đối. */
     function absolute_url(string $path = '/'): string
     {
         if (preg_match('#^https?://#i', $path)) {
             return $path;
         }
+
+        $app = App::instance();
+        if (PHP_SAPI !== 'cli') {
+            try {
+                $req = $app->get(Request::class);
+                $host = trim($req->host());
+                if ($host !== '') {
+                    $scheme = $req->isSecure() ? 'https' : 'http';
+                    return $scheme . '://' . $host . $app->urlBasePath() . '/' . ltrim($path, '/');
+                }
+            } catch (Throwable) {
+                // Request chưa bind trong container => dùng fallback APP_URL bên dưới
+            }
+        }
+
         $parts = parse_url((string) config('app.url', 'http://localhost'));
         $origin = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost') . (isset($parts['port']) ? ':' . $parts['port'] : '');
         return $origin . rtrim($parts['path'] ?? '', '/') . '/' . ltrim($path, '/');

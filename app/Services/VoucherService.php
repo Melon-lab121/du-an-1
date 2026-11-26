@@ -69,26 +69,32 @@ final class VoucherService
         }
 
         // 2. Kiểm tra thời hạn hiệu lực
-        $now = date('Y-m-d H:i:s');
-        if (!empty($voucher['start_date']) && $now < $voucher['start_date']) {
-            return [
-                'valid' => false,
-                'error' => 'Mã giảm giá chưa đến thời gian áp dụng (bắt đầu từ ' . date('d/m/Y', strtotime($voucher['start_date'])) . ').',
-                'voucher' => $voucher,
-                'discount' => 0,
-                'qualifying_subtotal' => 0,
-                'description' => '',
-            ];
+        $nowTs = time();
+        if (!empty($voucher['start_date'])) {
+            $startTs = $this->parseBoundaryTimestamp((string) $voucher['start_date'], false);
+            if ($startTs !== null && $nowTs < $startTs) {
+                return [
+                    'valid' => false,
+                    'error' => 'Mã giảm giá chưa đến thời gian áp dụng (bắt đầu từ ' . date('d/m/Y', $startTs) . ').',
+                    'voucher' => $voucher,
+                    'discount' => 0,
+                    'qualifying_subtotal' => 0,
+                    'description' => '',
+                ];
+            }
         }
-        if (!empty($voucher['end_date']) && $now > $voucher['end_date']) {
-            return [
-                'valid' => false,
-                'error' => 'Mã giảm giá đã hết hạn sử dụng (hết hạn ngày ' . date('d/m/Y', strtotime($voucher['end_date'])) . ').',
-                'voucher' => $voucher,
-                'discount' => 0,
-                'qualifying_subtotal' => 0,
-                'description' => '',
-            ];
+        if (!empty($voucher['end_date'])) {
+            $endTs = $this->parseBoundaryTimestamp((string) $voucher['end_date'], true);
+            if ($endTs !== null && $nowTs > $endTs) {
+                return [
+                    'valid' => false,
+                    'error' => 'Mã giảm giá đã hết hạn sử dụng (hết hạn ngày ' . date('d/m/Y', $endTs) . ').',
+                    'voucher' => $voucher,
+                    'discount' => 0,
+                    'qualifying_subtotal' => 0,
+                    'description' => '',
+                ];
+            }
         }
 
         // 3. Kiểm tra giỏ hàng rỗng
@@ -366,5 +372,90 @@ final class VoucherService
     public function remove(): void
     {
         $this->session->forget(self::SESSION_KEY);
+    }
+
+    /**
+     * Danh sách chỉ các voucher thực sự khả dụng cho giỏ hàng hiện tại
+     * (đang kích hoạt, còn hạn sử dụng, chưa hết lượt dùng và đủ điều kiện áp dụng).
+     *
+     * @param array<int, array<string, mixed>> $lines
+     * @return array<int, array{
+     *     voucher: array<string, mixed>,
+     *     eligible: bool,
+     *     discount: int,
+     *     description: string,
+     *     reason: ?string,
+     *     label: string
+     * }>
+     */
+    public function availableForCart(
+        array $lines,
+        ?int $userId = null,
+        ?string $email = null,
+        ?string $phone = null
+    ): array {
+        $nowTs = time();
+        $vouchers = Voucher::query()->where('is_active', 1)->orderBy('id', 'DESC')->get();
+        $result = [];
+
+        foreach ($vouchers as $v) {
+            if (!empty($v['start_date'])) {
+                $startTs = $this->parseBoundaryTimestamp((string) $v['start_date'], false);
+                if ($startTs !== null && $nowTs < $startTs) {
+                    continue;
+                }
+            }
+            if (!empty($v['end_date'])) {
+                $endTs = $this->parseBoundaryTimestamp((string) $v['end_date'], true);
+                if ($endTs !== null && $nowTs > $endTs) {
+                    continue;
+                }
+            }
+
+            $eval = $this->evaluate($v, $lines, $userId, $email, $phone);
+            if (!$eval['valid']) {
+                continue;
+            }
+
+            $vType = (int) ($v['voucher_type'] ?? 1);
+            $dType = (int) ($v['discount_type'] ?? 1);
+            $dVal = (int) ($v['discount_value'] ?? 0);
+            $maxCap = (int) ($v['max_discount_amount'] ?? 0);
+
+            $benefit = $dType === DiscountType::PERCENT
+                ? 'Giảm ' . $dVal . '%' . ($maxCap > 0 ? ', tối đa ' . money($maxCap) : '')
+                : 'Giảm ' . money($dVal);
+            if ($vType === VoucherType::FREESHIP) {
+                $benefit = $dType === DiscountType::PERCENT
+                    ? 'Freeship ' . $dVal . '%'
+                    : 'Freeship tối đa ' . money($dVal);
+            }
+
+            $result[] = [
+                'voucher' => $v,
+                'eligible' => true,
+                'discount' => $eval['discount'],
+                'description' => $eval['description'],
+                'reason' => null,
+                'label' => sprintf('%s — %s (−%s)', $v['code'], $benefit, money($eval['discount'])),
+            ];
+        }
+
+        usort($result, static fn (array $a, array $b): int => $b['discount'] <=> $a['discount']);
+
+        return $result;
+    }
+
+    private function parseBoundaryTimestamp(string $raw, bool $endOfDay): ?int
+    {
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return null;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $trimmed) === 1) {
+            $trimmed .= $endOfDay ? ' 23:59:59' : ' 00:00:00';
+        }
+        $ts = strtotime($trimmed);
+        return $ts === false ? null : $ts;
     }
 }
