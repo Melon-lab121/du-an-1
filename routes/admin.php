@@ -38,7 +38,6 @@ return function (Router $router): void {
         $r->get('/orders', [OrderController::class, 'index'])->name('orders.index');
         $r->get('/orders/{id:\d+}', [OrderController::class, 'show'])->name('orders.show');
         $r->post('/orders/{id:\d+}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
-        $r->post('/orders/{id:\d+}/refunded', [OrderController::class, 'refunded'])->name('orders.refunded');
         $r->post('/orders/{id:\d+}/payments/{paymentId:\d+}/reconcile', [OrderController::class, 'reconcile'])->name('orders.reconcile');
 
         // Quản lý Voucher

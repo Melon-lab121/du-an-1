@@ -10,7 +10,6 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Services\Auth;
 use App\Services\OrderService;
 use App\Services\Payment\PaymentService;
 use DomainException;
@@ -19,11 +18,8 @@ use RuntimeException;
 
 final class OrderController extends Controller
 {
-    public function __construct(
-        private OrderService $orders,
-        private PaymentService $payments,
-        private Auth $auth,
-    ) {
+    public function __construct(private OrderService $orders, private PaymentService $payments)
+    {
     }
 
     public function index(Request $request): Response
@@ -53,41 +49,15 @@ final class OrderController extends Controller
             'order' => $order,
             'items' => Order::items($id),
             'payments' => Order::payments($id),
-            'history' => Order::statusHistory($id),
-            'nextStatuses' => Order::nextStatuses((string) $order['status']),
         ]);
     }
 
     public function updateStatus(Request $request, int $id): Response
     {
-        $note = trim((string) $request->input('note', ''));
         try {
-            $this->orders->updateStatus(
-                $id,
-                (string) $request->input('status'),
-                changedBy: $this->auth->id(),
-                note: $note === '' ? null : mb_substr($note, 0, 255),
-            );
+            $this->orders->updateStatus($id, (string) $request->input('status'));
             $this->flash('success', 'Đã cập nhật trạng thái đơn.');
         } catch (DomainException | InvalidArgumentException $e) {
-            $this->flash('error', $e->getMessage());
-        }
-        return $this->redirect('/admin/orders/' . $id);
-    }
-
-    /** Admin xác nhận đã hoàn tiền thủ công cho đơn đang ở "Cần hoàn tiền". */
-    public function refunded(Request $request, int $id): Response
-    {
-        Order::findOrFail($id);
-        $note = trim((string) $request->input('note', ''));
-        try {
-            $this->orders->markRefunded(
-                $id,
-                $this->auth->id(),
-                $note === '' ? null : mb_substr($note, 0, 255),
-            );
-            $this->flash('success', 'Đã ghi nhận hoàn tiền cho khách.');
-        } catch (DomainException $e) {
             $this->flash('error', $e->getMessage());
         }
         return $this->redirect('/admin/orders/' . $id);

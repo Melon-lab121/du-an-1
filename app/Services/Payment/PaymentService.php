@@ -164,18 +164,14 @@ final class PaymentService
      * Ghi nhận thanh toán thành công. UPDATE có điều kiện status = pending đảm bảo chỉ 1 request
      * (IPN hoặc đối soát) thắng, dù chúng đến cùng lúc.
      *
-     * Cập nhật payments + cập nhật đơn hàng nằm chung 1 TRANSACTION: nếu cập nhật đơn lỗi thì payments
-     * cũng rollback về 'pending', nên IPN gửi lại / nút "Đối soát" vẫn xử lý được (không bị kẹt "đã trả tiền
-     * nhưng đơn vẫn chờ").
-     *
      * @param array<string, mixed> $payment
      * @param array{transaction_no: mixed, bank_code: mixed, response_code: string, raw: array<string, mixed>} $data
      */
     private function markSuccess(array $payment, array $data, string $source): bool
     {
-        $done = $this->db->transaction(function (Database $db) use ($payment, $data): bool {
+        return $this->db->transaction(function () use ($payment, $data, $source): bool {
             $now = date('Y-m-d H:i:s');
-            $updated = $db->update('payments', [
+            $updated = $this->db->update('payments', [
                 'status' => Payment::STATUS_SUCCESS,
                 'transaction_no' => $data['transaction_no'] !== null ? (string) $data['transaction_no'] : null,
                 'bank_code' => $data['bank_code'] !== null ? (string) $data['bank_code'] : null,
@@ -193,20 +189,16 @@ final class PaymentService
                 // Đơn đã được thanh toán bởi lượt khác => khách trả 2 lần, cần hoàn tiền thủ công
                 $this->logger->warning('SePay: đơn đã thanh toán trước đó, cần hoàn tiền', ['txn_ref' => $payment['txn_ref']], 'payment');
             }
+            $this->logger->info('SePay: đã xử lý (' . $source . ')', ['txn_ref' => $payment['txn_ref']], 'payment');
             return true;
         });
-
-        if ($done) {
-            $this->logger->info('SePay: đã xử lý (' . $source . ')', ['txn_ref' => $payment['txn_ref']], 'payment');
-        }
-        return $done;
     }
 
-    /** Mã tham chiếu duy nhất gửi sang cổng (order_invoice_number, chỉ chữ + số). */
+    /** Mã tham chiếu duy nhất gửi sang cổng (order_invoice_number, chỉ chữ + số, chống đoán trước). */
     private function generateTxnRef(): string
     {
         do {
-            $ref = date('ymdHis') . random_int(1000, 9999);
+            $ref = 'TXN' . date('ymd') . strtoupper(bin2hex(random_bytes(6)));
         } while ($this->db->table('payments')->where('txn_ref', $ref)->exists());
         return $ref;
     }

@@ -45,6 +45,9 @@ final class OrderService
             throw new DomainException('Giỏ hàng đang trống.');
         }
 
+        // Sắp xếp thứ tự key sản phẩm trước khi khoá kho để chống Deadlock
+        ksort($items);
+
         [$order, $lines] = $this->db->transaction(function (Database $db) use ($customer, $items, $paymentMethod, $userId): array {
             $lines = [];
             foreach ($items as $key => $qty) {
@@ -117,70 +120,39 @@ final class OrderService
                 $db->insert('order_items', $line + ['order_id' => $orderId]);
             }
 
-            $this->recordStatus($db, $orderId, null, 'pending', null, 'Khách đặt hàng');
-
             return [$db->table('orders')->find($orderId), $lines];
         });
 
-        $this->events->dispatch('order.created', ['order' => $order, 'items' => $lines]);
+        try {
+            $this->events->dispatch('order.created', ['order' => $order, 'items' => $lines]);
+        } catch (\Throwable) {
+            // Không để lỗi từ event listener làm hỏng đơn đã commit
+        }
         return $order;
     }
 
-    /**
-     * Đánh dấu đã thanh toán (idempotent). @return bool true nếu trạng thái thực sự thay đổi
-     *
-     * Toàn bộ chạy trong 1 transaction (dùng chung với transaction của PaymentService nếu có):
-     * lỗi giữa chừng thì rollback hết, IPN gửi lại sẽ xử lý được.
-     * Nếu đơn đã bị huỷ trước khi tiền về: không sống lại đơn, chỉ đánh dấu 'refund_needed' để admin hoàn tiền.
-     */
+    /** Đánh dấu đã thanh toán (idempotent). @return bool true nếu trạng thái thực sự thay đổi */
     public function markPaid(int $orderId): bool
     {
-        $result = $this->db->transaction(function (Database $db) use ($orderId): ?array {
-            $order = $db->table('orders')->find($orderId);
-            if ($order === null || !in_array($order['payment_status'], ['unpaid', 'failed'], true)) {
-                return null; // đã thanh toán / đang chờ hoàn tiền / không có đơn
-            }
-
-            $cancelled = $order['status'] === 'cancelled';
-            $now = date('Y-m-d H:i:s');
-            $updated = $db->update(
-                'orders',
-                [
-                    'payment_status' => $cancelled ? 'refund_needed' : 'paid',
-                    'paid_at' => $now,
-                    'updated_at' => $now,
-                ],
-                'id = ? AND payment_status = ?',
-                [$orderId, $order['payment_status']],
-            );
-            if ($updated === 0) {
-                return null; // request khác đã xử lý trước
-            }
-
-            $confirmed = false;
-            if ($cancelled) {
-                $this->recordStatus($db, $orderId, 'cancelled', 'cancelled', null, 'Nhận thanh toán sau khi đơn đã huỷ: cần hoàn tiền cho khách');
-            } elseif ($order['status'] === 'pending') {
-                // Đơn online đã thanh toán => tự xác nhận
-                $db->update('orders', ['status' => 'confirmed'], 'id = ? AND status = ?', [$orderId, 'pending']);
-                $this->recordStatus($db, $orderId, 'pending', 'confirmed', null, 'Tự động xác nhận sau khi thanh toán thành công');
-                $confirmed = true;
-            }
-
-            return ['cancelled' => $cancelled, 'confirmed' => $confirmed];
-        });
-
-        if ($result === null) {
-            return false;
+        $order = Order::find($orderId);
+        if ($order && (string) $order['status'] === 'cancelled') {
+            return false; // Không ghi nhận thanh toán cho đơn đã bị huỷ
         }
 
-        if ($result['confirmed']) {
-            $this->events->dispatch('order.status_changed', ['order' => Order::find($orderId), 'from' => 'pending', 'to' => 'confirmed']);
-        }
-        if (!$result['cancelled']) {
+        $now = date('Y-m-d H:i:s');
+        $changed = $this->db->update(
+            'orders',
+            ['payment_status' => 'paid', 'paid_at' => $now, 'updated_at' => $now],
+            'id = ? AND payment_status <> ? AND status <> ?',
+            [$orderId, 'paid', 'cancelled'],
+        ) > 0;
+
+        if ($changed) {
+            // Đơn online đã thanh toán => tự xác nhận
+            $this->db->update('orders', ['status' => 'confirmed'], 'id = ? AND status = ?', [$orderId, 'pending']);
             $this->events->dispatch('order.paid', ['order' => Order::find($orderId)]);
         }
-        return true;
+        return $changed;
     }
 
     public function markPaymentFailed(int $orderId): void
@@ -197,19 +169,14 @@ final class OrderService
         }
     }
 
-    /**
-     * Đổi trạng thái đơn theo đúng quy trình (xem Order::TRANSITIONS), ghi lịch sử.
-     * Huỷ đơn sẽ hoàn lại tồn kho; đơn đã thanh toán mà bị huỷ thì chuyển sang 'refund_needed'.
-     *
-     * @param int|null $changedBy id người dùng (admin) thực hiện; null = hệ thống
-     */
-    public function updateStatus(int $orderId, string $status, ?int $changedBy = null, ?string $note = null): void
+    /** Đổi trạng thái đơn; huỷ đơn sẽ hoàn lại tồn kho. */
+    public function updateStatus(int $orderId, string $status): void
     {
         if (!array_key_exists($status, Order::STATUSES)) {
             throw new InvalidArgumentException('Trạng thái không hợp lệ.');
         }
 
-        $this->db->transaction(function (Database $db) use ($orderId, $status, $changedBy, $note): void {
+        $this->db->transaction(function (Database $db) use ($orderId, $status): void {
             $order = $db->table('orders')->find($orderId) ?? throw new DomainException('Không tìm thấy đơn hàng.');
             $from = (string) $order['status'];
             if ($from === $status) {
@@ -218,33 +185,24 @@ final class OrderService
             if ($from === 'cancelled') {
                 throw new DomainException('Đơn đã huỷ, không thể đổi trạng thái.');
             }
-            if (!Order::canTransition($from, $status)) {
-                throw new DomainException(sprintf(
-                    'Không thể chuyển đơn từ "%s" sang "%s".',
-                    Order::statusLabel($from),
-                    Order::statusLabel($status),
-                ));
+            if ($from === 'completed' && $status !== 'cancelled') {
+                throw new DomainException('Đơn đã hoàn thành, không thể chuyển ngược trạng thái.');
             }
 
-            $changes = ['status' => $status, 'updated_at' => date('Y-m-d H:i:s')];
-            if ($status === 'cancelled' && $order['payment_status'] === 'paid') {
-                $changes['payment_status'] = 'refund_needed';
+            $now = date('Y-m-d H:i:s');
+            $updateData = ['status' => $status, 'updated_at' => $now];
+
+            // Nếu đơn COD giao thành công: tự động đánh dấu đã thanh toán
+            if ($status === 'completed' && ($order['payment_method'] ?? '') === 'cod' && ($order['payment_status'] ?? '') !== 'paid') {
+                $updateData['payment_status'] = 'paid';
+                $updateData['paid_at'] = $now;
             }
-            // COD: giao thành công thì coi như đã thu tiền mặt (để doanh thu tính đủ đơn COD)
-            $codCollected = $status === 'completed'
-                && $order['payment_method'] === 'cod'
-                && $order['payment_status'] === 'unpaid';
-            if ($codCollected) {
-                $changes['payment_status'] = 'paid';
-                $changes['paid_at'] = $changes['updated_at'];
+            // Nếu huỷ đơn đã trả tiền: chuyển sang hoàn tiền (refunded)
+            if ($status === 'cancelled' && ($order['payment_status'] ?? '') === 'paid') {
+                $updateData['payment_status'] = 'refunded';
             }
 
-            // Điều kiện status = $from: nếu admin khác vừa đổi trước thì không ghi đè
-            $updated = $db->update('orders', $changes, 'id = ? AND status = ?', [$orderId, $from]);
-            if ($updated === 0) {
-                throw new DomainException('Đơn vừa được cập nhật bởi người khác, vui lòng tải lại trang.');
-            }
-            $this->recordStatus($db, $orderId, $from, $status, $changedBy, $note);
+            $db->update('orders', $updateData, 'id = ?', [$orderId]);
 
             if ($status === 'cancelled') {
                 // Hoàn kho cả khi sản phẩm/biến thể đang nằm thùng rác (khôi phục thì số tồn vẫn đúng)
@@ -261,49 +219,7 @@ final class OrderService
             }
 
             $this->events->dispatch('order.status_changed', ['order' => Order::find($orderId), 'from' => $from, 'to' => $status]);
-            if ($codCollected) {
-                $this->events->dispatch('order.paid', ['order' => Order::find($orderId)]);
-            }
         });
-    }
-
-    /**
-     * Admin xác nhận ĐÃ HOÀN TIỀN thủ công cho đơn đang ở 'refund_needed' (đơn đã huỷ mà khách đã trả tiền).
-     * Chỉ đổi payment_status sang 'refunded' và ghi lịch sử; trạng thái đơn giữ nguyên ('cancelled').
-     *
-     * @param int|null $changedBy id người dùng (admin) thực hiện
-     */
-    public function markRefunded(int $orderId, ?int $changedBy = null, ?string $note = null): void
-    {
-        $this->db->transaction(function (Database $db) use ($orderId, $changedBy, $note): void {
-            $order = $db->table('orders')->find($orderId) ?? throw new DomainException('Không tìm thấy đơn hàng.');
-
-            $updated = $db->update(
-                'orders',
-                ['payment_status' => 'refunded', 'updated_at' => date('Y-m-d H:i:s')],
-                'id = ? AND payment_status = ?',
-                [$orderId, 'refund_needed'],
-            );
-            if ($updated === 0) {
-                throw new DomainException('Đơn này không ở trạng thái "Cần hoàn tiền".');
-            }
-
-            $status = (string) $order['status'];
-            $this->recordStatus($db, $orderId, $status, $status, $changedBy, $note ?: 'Đã hoàn tiền cho khách');
-        });
-    }
-
-    /** Ghi 1 dòng lịch sử đổi trạng thái. $changedBy null = hệ thống tự đổi. */
-    private function recordStatus(Database $db, int $orderId, ?string $from, string $to, ?int $changedBy = null, ?string $note = null): void
-    {
-        $db->insert('order_status_histories', [
-            'order_id' => $orderId,
-            'from_status' => $from,
-            'to_status' => $to,
-            'note' => $note,
-            'changed_by' => $changedBy,
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
     }
 
     /**
