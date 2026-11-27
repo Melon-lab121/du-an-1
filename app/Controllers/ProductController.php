@@ -172,75 +172,6 @@ final class ProductController extends Controller
         );
     }
 
-    /** Lưu SKU / giá / giá KM / tồn kho / ảnh (tuỳ chọn) của từng biến thể. */
-    public function saveVariants(Request $request, int $id): Response
-    {
-        Product::findOrFail($id);
-        $input = $request->input('variants', []);
-        $rows = [];
-        $errors = [];
-
-        foreach (is_array($input) ? $input : [] as $variantId => $row) {
-            $row = is_array($row) ? $row : [];
-            $vid = (int) $variantId;
-            if ($vid <= 0) {
-                continue;
-            }
-
-            $price = filter_var($row['price'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-            $stock = filter_var($row['stock'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-            $sale = trim((string) ($row['sale_price'] ?? '')) === ''
-                ? null
-                : filter_var($row['sale_price'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-            $sku = trim((string) ($row['sku'] ?? ''));
-
-            if ($price === false || $stock === false || $sale === false || mb_strlen($sku) > 64) {
-                $errors['variants'] = 'Giá, giá KM, tồn kho phải là số nguyên ≥ 0; SKU tối đa 64 ký tự.';
-                continue;
-            }
-
-            $rows[$vid] = [
-                'sku' => $sku === '' ? null : $sku,
-                'price' => (int) $price,
-                'sale_price' => $sale === null ? null : (int) $sale,
-                'stock' => (int) $stock,
-            ];
-
-            // Hỗ trợ upload ảnh riêng cho từng biến thể (input name="variant_images[ID]") nếu có
-            $files = $request->files()['variant_images'] ?? null;
-            if (is_array($files) && isset($files['tmp_name'][$vid]) && (int) ($files['error'][$vid] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-                try {
-                    $singleFile = [
-                        'name' => $files['name'][$vid] ?? 'variant.jpg',
-                        'type' => $files['type'][$vid] ?? '',
-                        'tmp_name' => $files['tmp_name'][$vid],
-                        'error' => $files['error'][$vid],
-                        'size' => $files['size'][$vid] ?? 0,
-                    ];
-                    $uploadedPath = $this->uploader->image($singleFile, 'variants');
-                    if ($uploadedPath !== null) {
-                        $this->db->update('product_variants', ['image' => $uploadedPath], 'id = ? AND product_id = ?', [$vid, $id]);
-                    }
-                } catch (DomainException $e) {
-                    $errors['variants'] = $e->getMessage();
-                }
-            }
-        }
-
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors, $request->all());
-        }
-
-        try {
-            $this->variants->updateVariants($id, $rows);
-        } catch (DomainException $e) {
-            throw ValidationException::withMessages(['variants' => $e->getMessage()], $request->all());
-        }
-
-        $this->flash('success', 'Đã lưu cấu hình giá, tồn kho và phân loại biến thể.');
-        return $this->redirect('/admin/products/' . $id . '/edit');
-    }
-
     private function resolveCurrentUser(): ?array
     {
         try {
@@ -265,7 +196,7 @@ final class ProductController extends Controller
         }
 
         if (!empty($_SESSION['user_id'])) {
-            $row = $this->db->selectOne('SELECT id, name, email, role, role_id FROM users WHERE id = ?', [(int) $_SESSION['user_id']]);
+            $row = $this->db->selectOne('SELECT id, name, email, role FROM users WHERE id = ?', [(int) $_SESSION['user_id']]);
             if (is_array($row) && !empty($row['id'])) {
                 return $row;
             }

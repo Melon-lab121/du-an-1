@@ -95,6 +95,10 @@ final class Category extends Model
     {
         return (int) self::db()->transaction(static function ($db) use ($id): int {
             $db->delete('product_categories', 'category_id = ?', [$id]);
+            try {
+                $db->delete('voucher_categories', 'category_id = ?', [$id]);
+            } catch (\Throwable) {
+            }
             $db->update('products', ['category_id' => null], 'category_id = ?', [$id]);
             $db->update('categories', ['parent_id' => null], 'parent_id = ?', [$id]);
 

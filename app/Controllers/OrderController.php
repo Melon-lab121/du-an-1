@@ -12,6 +12,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Models\Order;
 use App\Services\Auth;
+use App\Services\OrderService;
 use App\Services\Payment\PaymentService;
 use DomainException;
 use RuntimeException;
@@ -21,6 +22,7 @@ final class OrderController extends Controller
     public function __construct(
         private Auth $auth,
         private Session $session,
+        private OrderService $orders,
         private PaymentService $payments,
         private Database $db,
     ) {}
@@ -60,15 +62,14 @@ final class OrderController extends Controller
             return $this->redirect('order.show', ['code' => $code]);
         }
 
-        $now = date('Y-m-d H:i:s');
-        $isPaidOnline = Order::isOnlineMethod($order) && (($order['payment_status'] ?? '') === 'paid');
+        try {
+            $this->orders->updateStatus((int) $order['id'], 'cancelled');
+        } catch (DomainException $e) {
+            $this->flash('error', $e->getMessage());
+            return $this->redirect('order.show', ['code' => $code]);
+        }
 
-        $this->db->update('orders', [
-            'status' => 'cancelled',
-            'cancelled_at' => $now,
-            'refund_status' => $isPaidOnline ? 'pending_refund' : 'none',
-            'updated_at' => $now,
-        ], 'id = ?', [(int) $order['id']]);
+        $isPaidOnline = Order::isOnlineMethod($order) && (($order['payment_status'] ?? '') === 'paid');
 
         $this->flash('success', $isPaidOnline
             ? 'Đã hủy đơn hàng. Yêu cầu hoàn tiền đã được ghi nhận cho admin xử lý.'

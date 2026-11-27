@@ -116,7 +116,7 @@ final class OrderController extends Controller
         $this->db->update('order_returns', [
             'status' => 'refunded',
             'updated_at' => $now,
-        ], 'order_id = ? AND status IN ("pending", "approved")', [$id]);
+        ], "order_id = ? AND status IN ('pending', 'approved')", [$id]);
 
         $this->flash('success', 'Đã xác nhận hoàn tiền cho đơn hàng.');
         return $this->redirect('/admin/orders/' . $id);

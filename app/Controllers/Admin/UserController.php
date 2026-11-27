@@ -50,12 +50,18 @@ final class UserController extends Controller
         $total = (int) ($countRow['cnt'] ?? 0);
 
         $sql = "SELECT u.*,
-                       COUNT(o.id) AS order_count,
-                       COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.total ELSE 0 END), 0) AS total_spent
+                       COALESCE(agg.order_count, 0) AS order_count,
+                       COALESCE(agg.total_spent, 0) AS total_spent
                 FROM users u
-                LEFT JOIN orders o ON o.user_id = u.id
+                LEFT JOIN (
+                    SELECT user_id,
+                           COUNT(*) AS order_count,
+                           SUM(CASE WHEN payment_status = 'paid' THEN total ELSE 0 END) AS total_spent
+                    FROM orders
+                    WHERE user_id IS NOT NULL
+                    GROUP BY user_id
+                ) agg ON agg.user_id = u.id
                 WHERE {$whereSql}
-                GROUP BY u.id
                 ORDER BY u.id DESC
                 LIMIT {$perPage} OFFSET {$offset}";
 
@@ -139,7 +145,29 @@ final class UserController extends Controller
             throw new HttpException(404, 'Không tìm thấy người dùng');
         }
 
-        $this->db->delete('users', 'id = ?', [$id]);
+        $this->db->transaction(static function (Database $db) use ($id): void {
+            $db->update('orders', ['user_id' => null], 'user_id = ?', [$id]);
+            try {
+                $db->update('order_returns', ['user_id' => null], 'user_id = ?', [$id]);
+            } catch (\Throwable) {
+            }
+            foreach (['addresses', 'comments'] as $table) {
+                try {
+                    $db->delete($table, 'user_id = ?', [$id]);
+                } catch (\Throwable) {
+                }
+            }
+            try {
+                $cartIds = array_map('intval', $db->table('carts')->where('user_id', $id)->pluck('id'));
+                if ($cartIds !== []) {
+                    $placeholders = implode(', ', array_fill(0, count($cartIds), '?'));
+                    $db->delete('cart_details', "cart_id IN ({$placeholders})", $cartIds);
+                    $db->delete('carts', 'user_id = ?', [$id]);
+                }
+            } catch (\Throwable) {
+            }
+            $db->delete('users', 'id = ?', [$id]);
+        });
         $this->flash('success', 'Đã xóa người dùng.');
         return $this->redirect('/admin/users');
     }

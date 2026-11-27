@@ -169,26 +169,80 @@ final class DashboardStats
      */
     public function mergeGroups(int $limit = 20): array
     {
-        return $this->db->select(
-            "SELECT o.customer_phone,
-                    MAX(o.customer_name) AS customer_name,
+        $rows = $this->db->select(
+            "SELECT o.id AS order_id,
+                    o.code AS order_code,
+                    o.customer_phone,
+                    o.customer_name,
                     oi.product_id,
                     oi.variant_id,
-                    MAX(oi.product_name) AS product_name,
-                    MAX(oi.variant_label) AS variant_label,
-                    COUNT(DISTINCT o.id) AS order_count,
-                    SUM(oi.quantity) AS total_qty,
-                    GROUP_CONCAT(DISTINCT o.code ORDER BY o.id DESC SEPARATOR ', ') AS order_codes
+                    oi.product_name,
+                    oi.variant_label,
+                    oi.quantity
              FROM orders o
              INNER JOIN order_items oi ON oi.order_id = o.id
              WHERE o.status NOT IN ('cancelled', 'completed', 'returned', 'delivery_failed')
                AND TRIM(COALESCE(o.customer_phone, '')) <> ''
-             GROUP BY o.customer_phone, oi.product_id, COALESCE(oi.variant_id, 0)
-             HAVING COUNT(DISTINCT o.id) >= 2
-             ORDER BY order_count DESC, MAX(o.id) DESC
-             LIMIT ?",
-            [max(1, $limit)],
+             ORDER BY o.id DESC",
         );
+
+        $groups = [];
+        foreach ($rows as $row) {
+            $phone = (string) $row['customer_phone'];
+            $productId = $row['product_id'] !== null ? (int) $row['product_id'] : 0;
+            $variantId = $row['variant_id'] !== null ? (int) $row['variant_id'] : 0;
+            $key = $phone . '|' . $productId . '|' . $variantId;
+
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'customer_phone' => $phone,
+                    'customer_name' => (string) ($row['customer_name'] ?? ''),
+                    'product_id' => $row['product_id'] !== null ? (int) $row['product_id'] : null,
+                    'variant_id' => $row['variant_id'] !== null ? (int) $row['variant_id'] : null,
+                    'product_name' => (string) ($row['product_name'] ?? ''),
+                    'variant_label' => $row['variant_label'],
+                    'order_ids' => [],
+                    'order_codes_list' => [],
+                    'total_qty' => 0,
+                    'max_order_id' => (int) $row['order_id'],
+                ];
+            }
+
+            $orderId = (int) $row['order_id'];
+            if (!isset($groups[$key]['order_ids'][$orderId])) {
+                $groups[$key]['order_ids'][$orderId] = true;
+                $groups[$key]['order_codes_list'][] = (string) $row['order_code'];
+            }
+            $groups[$key]['total_qty'] += (int) $row['quantity'];
+        }
+
+        $result = [];
+        foreach ($groups as $g) {
+            $orderCount = count($g['order_ids']);
+            if ($orderCount < 2) {
+                continue;
+            }
+            $result[] = [
+                'customer_phone' => $g['customer_phone'],
+                'customer_name' => $g['customer_name'],
+                'product_id' => $g['product_id'],
+                'variant_id' => $g['variant_id'],
+                'product_name' => $g['product_name'],
+                'variant_label' => $g['variant_label'],
+                'order_count' => $orderCount,
+                'total_qty' => $g['total_qty'],
+                'order_codes' => implode(', ', $g['order_codes_list']),
+                '_max_order_id' => $g['max_order_id'],
+            ];
+        }
+
+        usort($result, static fn (array $a, array $b): int => [$b['order_count'], $b['_max_order_id']] <=> [$a['order_count'], $a['_max_order_id']]);
+        $result = array_slice($result, 0, max(1, $limit));
+
+        return array_map(static function (array $row): array {
+            unset($row['_max_order_id']);
+            return $row;
+        }, $result);
     }
 
     /**

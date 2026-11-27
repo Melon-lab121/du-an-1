@@ -671,6 +671,17 @@ final class VariantService
                 throw new DomainException('Biến thể không tồn tại.');
             }
 
+            if ($db->table('order_items')->where('variant_id', $variantId)->exists()) {
+                throw new DomainException('Biến thể đã có trong đơn hàng nên không thể xoá vĩnh viễn.');
+            }
+
+            foreach (['cart_reservations', 'cart_details'] as $table) {
+                try {
+                    $db->delete($table, 'variant_id = ?', [$variantId]);
+                } catch (\Throwable) {
+                }
+            }
+
             $linkedValueIds = array_map(
                 static fn(array $r): int => (int) $r['option_value_id'],
                 $db->select('SELECT option_value_id FROM product_variant_values WHERE variant_id = ?', [$variantId]),

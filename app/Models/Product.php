@@ -70,6 +70,35 @@ final class Product extends Model
         return self::db()->table('order_items')->where('product_id', $id)->exists();
     }
 
+    /** Xoá vĩnh viễn sản phẩm và dọn các liên kết phụ để không vướng khoá ngoại. */
+    public static function forceDeleteById(int $id): int
+    {
+        return (int) self::db()->transaction(static function ($db) use ($id): int {
+            foreach (['product_categories', 'voucher_products', 'cart_details', 'cart_reservations', 'comments'] as $table) {
+                try {
+                    $db->delete($table, 'product_id = ?', [$id]);
+                } catch (\Throwable) {
+                }
+            }
+
+            $variantIds = array_map('intval', $db->table('product_variants')->where('product_id', $id)->pluck('id'));
+            if ($variantIds !== []) {
+                $placeholders = implode(', ', array_fill(0, count($variantIds), '?'));
+                $db->delete('product_variant_values', "variant_id IN ({$placeholders})", $variantIds);
+                $db->delete('product_variants', 'product_id = ?', [$id]);
+            }
+
+            $optionIds = array_map('intval', $db->table('product_options')->where('product_id', $id)->pluck('id'));
+            if ($optionIds !== []) {
+                $placeholders = implode(', ', array_fill(0, count($optionIds), '?'));
+                $db->delete('product_option_values', "option_id IN ({$placeholders})", $optionIds);
+                $db->delete('product_options', 'product_id = ?', [$id]);
+            }
+
+            return parent::forceDeleteById($id);
+        });
+    }
+
     private static function stripSuffix(string $value, string $suffix): string
     {
         return str_ends_with($value, $suffix) ? substr($value, 0, -strlen($suffix)) : $value;
