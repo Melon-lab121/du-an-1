@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 26, 2026 at 01:49 PM
+-- Generation Time: Nov 27, 2026 at 06:47 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -74,11 +74,9 @@ CREATE TABLE `cart_details` (
 INSERT INTO `cart_details` (`id`, `cart_id`, `product_id`, `variant_id`, `quantity`) VALUES
 (26, 2, 74, NULL, 1),
 (27, 2, 52, NULL, 1),
-(32, 1, 34, NULL, 1),
-(33, 1, 31, NULL, 1),
-(34, 1, 52, NULL, 1),
-(35, 1, 51, NULL, 1),
-(36, 1, 30, NULL, 1);
+(83, 1, 51, NULL, 1),
+(84, 1, 49, NULL, 1),
+(85, 1, 44, NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -204,7 +202,8 @@ CREATE TABLE `comments` (
 --
 
 INSERT INTO `comments` (`id`, `user_id`, `product_id`, `rating`, `body`, `status`, `created_at`, `updated_at`) VALUES
-(6, 10, 52, 5, 'Đẹp', 'approved', '2026-11-26 19:28:02', '2026-11-26 19:28:02');
+(6, 10, 52, 5, 'Đẹp', 'approved', '2026-11-26 19:28:02', '2026-11-26 19:28:02'),
+(9, 10, 44, 5, 'fjajfia', 'approved', '2026-11-26 19:58:12', '2026-11-26 19:58:12');
 
 -- --------------------------------------------------------
 
@@ -224,6 +223,30 @@ CREATE TABLE `discount_types` (
 INSERT INTO `discount_types` (`id`, `discount_type`) VALUES
 (1, 'Giảm theo phần trăm'),
 (2, 'Giảm số tiền cố định');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `guest_inquiries`
+--
+
+CREATE TABLE `guest_inquiries` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `phone` varchar(30) NOT NULL,
+  `name` varchar(120) NOT NULL,
+  `address` varchar(255) NOT NULL,
+  `created_at` datetime NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `guest_inquiries`
+--
+
+INSERT INTO `guest_inquiries` (`id`, `phone`, `name`, `address`, `created_at`) VALUES
+(1, '0989474744', 'sdfaf', 'sfaff', '2026-11-27 22:15:52'),
+(2, '0989098890', 'sdfaff', 'sfaf', '2026-11-27 22:16:18'),
+(3, '0946789011', 'fadf', 'dfafs', '2026-11-28 00:30:23'),
+(4, '0915345678', 'djfaof', 'dfjaof', '2026-11-28 00:42:19');
 
 -- --------------------------------------------------------
 
@@ -251,26 +274,42 @@ CREATE TABLE `orders` (
   `status` varchar(50) NOT NULL DEFAULT 'pending',
   `paid_at` datetime DEFAULT NULL,
   `created_at` datetime DEFAULT NULL,
-  `updated_at` datetime DEFAULT NULL
+  `updated_at` datetime DEFAULT NULL,
+  `shipping_attempts` tinyint(3) UNSIGNED NOT NULL DEFAULT 0,
+  `shipped_at` datetime DEFAULT NULL,
+  `delivered_at` datetime DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL,
+  `refund_status` varchar(30) NOT NULL DEFAULT 'none',
+  `refund_note` text DEFAULT NULL,
+  `refunded_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `orders`
 --
 
-INSERT INTO `orders` (`id`, `code`, `date`, `total`, `user_id`, `customer_name`, `customer_email`, `customer_phone`, `shipping_address`, `note`, `subtotal`, `shipping_fee`, `discount`, `voucher_code`, `payment_method`, `payment_status`, `status`, `paid_at`, `created_at`, `updated_at`) VALUES
-(3, 'DH2611214A6B7F', '0000-00-00', 26225000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-21 23:38:44', '2026-11-21 23:38:25', '2026-11-21 23:38:44'),
-(4, 'DH261122DB7BA5', '0000-00-00', 1499750, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 1499750, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 00:48:09', '2026-11-22 00:47:55', '2026-11-22 00:48:09'),
-(5, 'DH261122EAD726', NULL, 2149750, NULL, 'Khach Vang Lai', 'guest1795326481@example.com', '0987654321', '123 Test St', NULL, 2149750, 0, 0, NULL, 'cod', 'unpaid', 'pending', NULL, '2026-11-22 12:48:01', '2026-11-22 12:48:01'),
-(6, 'DH2611228F6FC0', '2026-11-22', 2149750, NULL, 'COD Tester', 'cod1795327739@test.com', '0909090909', 'Hanoi', NULL, 2149750, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-22 13:08:59', '2026-11-22 13:08:59', '2026-11-22 13:08:59'),
-(7, 'DH2611220335DA', '2026-11-22', 2149750, NULL, 'Refund Tester', 'refund1795327783@test.com', '0909090909', 'Hanoi', NULL, 2149750, 0, 0, NULL, 'sepay', 'refunded', 'cancelled', '2026-11-22 13:09:43', '2026-11-22 13:09:43', '2026-11-22 13:09:43'),
-(8, 'DH2611228711E6', NULL, 2149750, NULL, 'Khach Vang Lai', 'guest1795327895@example.com', '0987654321', '123 Test St', NULL, 2149750, 0, 0, NULL, 'cod', 'unpaid', 'pending', NULL, '2026-11-22 13:11:35', '2026-11-22 13:11:35'),
-(9, 'DH261122CE28B0', NULL, 26225000, NULL, 'Huy Quang', 'huyq8545@gmail.com', '0977214236', 'Thanh Hóa', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 13:21:13', '2026-11-22 13:20:28', '2026-11-22 13:21:13'),
-(10, 'DH26112269E6E2', NULL, 17599750, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 17599750, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 16:06:59', '2026-11-22 16:06:47', '2026-11-22 16:06:59'),
-(11, 'DH261124E24DE5', NULL, 26225000, NULL, 'Huy', 'huy@gmail.con', '0987564859', 'Thanh Hoá', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-24 13:32:05', '2026-11-24 13:31:43', '2026-11-24 13:32:05'),
-(12, 'DH2611265A7FD5', NULL, 1824500, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 1824500, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-26 19:09:20', '2026-11-26 00:55:53', '2026-11-26 19:09:20'),
-(13, 'DH2611268AE1F8', NULL, 26225000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 26225000, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-26 18:11:24', '2026-11-26 18:10:19', '2026-11-26 18:11:24'),
-(14, 'DH261126321A16', NULL, 12475000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 12475000, 0, 0, NULL, 'cod', 'unpaid', 'confirmed', NULL, '2026-11-26 18:12:48', '2026-11-26 18:13:12');
+INSERT INTO `orders` (`id`, `code`, `date`, `total`, `user_id`, `customer_name`, `customer_email`, `customer_phone`, `shipping_address`, `note`, `subtotal`, `shipping_fee`, `discount`, `voucher_code`, `payment_method`, `payment_status`, `status`, `paid_at`, `created_at`, `updated_at`, `shipping_attempts`, `shipped_at`, `delivered_at`, `completed_at`, `cancelled_at`, `refund_status`, `refund_note`, `refunded_at`) VALUES
+(3, 'DH2611214A6B7F', '0000-00-00', 26225000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-21 23:38:44', '2026-11-21 23:38:25', '2026-11-21 23:38:44', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(4, 'DH261122DB7BA5', '0000-00-00', 1499750, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 1499750, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 00:48:09', '2026-11-22 00:47:55', '2026-11-22 00:48:09', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(5, 'DH261122EAD726', NULL, 2149750, NULL, 'Khach Vang Lai', 'guest1795326481@example.com', '0987654321', '123 Test St', NULL, 2149750, 0, 0, NULL, 'cod', 'unpaid', 'pending', NULL, '2026-11-22 12:48:01', '2026-11-22 12:48:01', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(6, 'DH2611228F6FC0', '2026-11-22', 2149750, NULL, 'COD Tester', 'cod1795327739@test.com', '0909090909', 'Hanoi', NULL, 2149750, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-22 13:08:59', '2026-11-22 13:08:59', '2026-11-22 13:08:59', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(7, 'DH2611220335DA', '2026-11-22', 2149750, NULL, 'Refund Tester', 'refund1795327783@test.com', '0909090909', 'Hanoi', NULL, 2149750, 0, 0, NULL, 'sepay', 'refunded', 'cancelled', '2026-11-22 13:09:43', '2026-11-22 13:09:43', '2026-11-22 13:09:43', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(8, 'DH2611228711E6', NULL, 2149750, NULL, 'Khach Vang Lai', 'guest1795327895@example.com', '0987654321', '123 Test St', NULL, 2149750, 0, 0, NULL, 'cod', 'unpaid', 'pending', NULL, '2026-11-22 13:11:35', '2026-11-22 13:11:35', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(9, 'DH261122CE28B0', NULL, 26225000, NULL, 'Huy Quang', 'huyq8545@gmail.com', '0977214236', 'Thanh Hóa', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 13:21:13', '2026-11-22 13:20:28', '2026-11-22 13:21:13', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(10, 'DH26112269E6E2', NULL, 17599750, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 17599750, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-22 16:06:59', '2026-11-22 16:06:47', '2026-11-22 16:06:59', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(11, 'DH261124E24DE5', NULL, 26225000, NULL, 'Huy', 'huy@gmail.con', '0987564859', 'Thanh Hoá', NULL, 26225000, 0, 0, NULL, 'sepay', 'paid', 'confirmed', '2026-11-24 13:32:05', '2026-11-24 13:31:43', '2026-11-24 13:32:05', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(12, 'DH2611265A7FD5', NULL, 1824500, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 1824500, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-26 19:09:20', '2026-11-26 00:55:53', '2026-11-26 19:09:20', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(13, 'DH2611268AE1F8', NULL, 26225000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 26225000, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-26 18:11:24', '2026-11-26 18:10:19', '2026-11-26 18:11:24', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(14, 'DH261126321A16', NULL, 12475000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 12475000, 0, 0, NULL, 'cod', 'unpaid', 'confirmed', NULL, '2026-11-26 18:12:48', '2026-11-26 18:13:12', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(15, 'DH2611268078AB', NULL, 7674500, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 7674500, 0, 0, NULL, 'cod', 'paid', 'completed', '2026-11-26 19:57:58', '2026-11-26 19:56:59', '2026-11-26 19:57:58', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(16, 'DH2611272007E3', NULL, 354750, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 324750, 30000, 0, NULL, 'cod', 'unpaid', 'cancelled', NULL, '2026-11-27 00:43:39', '2026-11-27 00:44:17', 0, NULL, NULL, NULL, '2026-11-27 00:44:17', 'none', NULL, NULL),
+(17, 'DH261127FEA0F0', NULL, 26225000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 26225000, 0, 0, NULL, 'cod', 'paid', 'returned', '2026-11-27 00:45:31', '2026-11-27 00:44:41', '2026-11-27 01:48:00', 1, '2026-11-27 00:45:01', NULL, '2026-11-27 00:45:31', NULL, 'none', NULL, NULL),
+(18, 'DH261127FA4D01', NULL, 12475000, 10, 'Customer', 'customer@gmail.com', '0987654321', 'TP. Hồ Chí Minh', NULL, 12475000, 0, 0, NULL, 'cod', 'unpaid', 'returned', NULL, '2026-11-27 00:45:51', '2026-11-27 01:01:27', 0, NULL, '2026-11-27 00:46:04', '2026-11-27 01:00:45', NULL, 'none', NULL, NULL),
+(19, 'DH2611278BC97B', NULL, 12475000, NULL, 'sdfaf', 'guest@noithatluxe.local', '0989474744', 'sfaff', NULL, 12475000, 0, 0, NULL, 'sepay', 'unpaid', 'confirmed', NULL, '2026-11-27 22:15:52', '2026-11-27 22:15:52', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(20, 'DH261127F69C82', NULL, 404750, NULL, 'sdfaff', 'guest@noithatluxe.local', '0989098890', 'sfaf', NULL, 374750, 30000, 0, NULL, 'cod', 'unpaid', 'pending', NULL, '2026-11-27 22:16:18', '2026-11-27 22:16:18', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(21, 'DH26112879907D', NULL, 1499750, NULL, 'fadf', 'guest@noithatluxe.local', '0946789011', 'dfafs', NULL, 1499750, 0, 0, NULL, 'cod', 'unpaid', 'pending', NULL, '2026-11-28 00:30:23', '2026-11-28 00:30:23', 0, NULL, NULL, NULL, NULL, 'none', NULL, NULL),
+(22, 'DH261128BC4459', NULL, 26225000, NULL, 'djfaof', 'guest@noithatluxe.local', '0915345678', 'dfjaof', NULL, 26225000, 0, 0, NULL, 'cod', 'unpaid', 'cancelled', NULL, '2026-11-28 00:42:19', '2026-11-28 00:42:27', 0, NULL, NULL, NULL, '2026-11-28 00:42:27', 'none', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -310,7 +349,43 @@ INSERT INTO `order_items` (`id`, `order_id`, `product_id`, `variant_id`, `produc
 (12, 12, 31, NULL, 'ZAMIOCULCAS potted plant, Aroid palm, 6\"', NULL, 'SP0031', 324750, 1, 324750),
 (13, 12, 51, NULL, 'VRIGSTAD mirror, sedge, 24 ¾\"', NULL, 'SP0051', 1499750, 1, 1499750),
 (14, 13, 52, NULL, 'VRETSTORP sleeper sofa, Kilanda light beige', NULL, 'SP0052', 26225000, 1, 26225000),
-(15, 14, 49, NULL, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', NULL, 'SP0049', 12475000, 1, 12475000);
+(15, 14, 49, NULL, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', NULL, 'SP0049', 12475000, 1, 12475000),
+(16, 15, 30, NULL, 'ZEBRASÄV pendant lamp, brown/paper, 14\"', NULL, 'SP0030', 299750, 1, 299750),
+(17, 15, 34, NULL, 'YTTERVÅG nightstand, gray-brown, 181/2x161/8\"', NULL, 'SP0034', 3749750, 1, 3749750),
+(18, 15, 44, NULL, 'YNGVAR chair, anthracite', NULL, 'SP0044', 3625000, 1, 3625000),
+(19, 16, 31, NULL, 'ZAMIOCULCAS potted plant, Aroid palm, 6\"', NULL, 'SP0031', 324750, 1, 324750),
+(20, 17, 52, NULL, 'VRETSTORP sleeper sofa, Kilanda light beige', NULL, 'SP0052', 26225000, 1, 26225000),
+(21, 18, 49, NULL, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', NULL, 'SP0049', 12475000, 1, 12475000),
+(22, 19, 49, NULL, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', NULL, 'SP0049', 12475000, 1, 12475000),
+(23, 20, 70, NULL, 'VIVALLA tablet stand, bamboo, 101/4x63/4\"', NULL, 'SP0070', 374750, 1, 374750),
+(24, 21, 51, NULL, 'VRIGSTAD mirror, sedge, 24 ¾\"', NULL, 'SP0051', 1499750, 1, 1499750),
+(25, 22, 52, NULL, 'VRETSTORP sleeper sofa, Kilanda light beige', NULL, 'SP0052', 26225000, 1, 26225000);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `order_returns`
+--
+
+CREATE TABLE `order_returns` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `order_id` int(10) NOT NULL,
+  `user_id` int(10) DEFAULT NULL,
+  `reason` varchar(64) NOT NULL,
+  `description` text NOT NULL,
+  `proof_image` varchar(255) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'pending',
+  `admin_note` text DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `order_returns`
+--
+
+INSERT INTO `order_returns` (`id`, `order_id`, `user_id`, `reason`, `description`, `proof_image`, `status`, `admin_note`, `created_at`, `updated_at`) VALUES
+(2, 17, 10, 'damaged', 'sfaf', '/uploads/returns/proof_7474f1a807a1885a.png', 'pending', NULL, '2026-11-27 01:48:00', '2026-11-27 01:48:00');
 
 -- --------------------------------------------------------
 
@@ -323,34 +398,6 @@ CREATE TABLE `order_status` (
   `status` varchar(255) NOT NULL,
   `order_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `order_status_histories`
---
-
-CREATE TABLE `order_status_histories` (
-  `id` bigint(20) UNSIGNED NOT NULL,
-  `order_id` bigint(20) UNSIGNED NOT NULL,
-  `from_status` varchar(20) DEFAULT NULL,
-  `to_status` varchar(20) NOT NULL,
-  `note` varchar(255) DEFAULT NULL,
-  `changed_by` bigint(20) UNSIGNED DEFAULT NULL,
-  `created_at` datetime DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `order_status_histories`
---
-
-INSERT INTO `order_status_histories` (`id`, `order_id`, `from_status`, `to_status`, `note`, `changed_by`, `created_at`) VALUES
-(1, 13, NULL, 'pending', 'Khách đặt hàng', NULL, '2026-11-26 18:10:19'),
-(2, 13, 'pending', 'confirmed', NULL, 9, '2026-11-26 18:11:06'),
-(3, 13, 'confirmed', 'shipping', NULL, 9, '2026-11-26 18:11:16'),
-(4, 13, 'shipping', 'completed', NULL, 9, '2026-11-26 18:11:24'),
-(5, 14, NULL, 'pending', 'Khách đặt hàng', NULL, '2026-11-26 18:12:48'),
-(6, 14, 'pending', 'confirmed', NULL, 9, '2026-11-26 18:13:12');
 
 -- --------------------------------------------------------
 
@@ -384,7 +431,8 @@ INSERT INTO `payments` (`id`, `order_id`, `gateway`, `txn_ref`, `amount`, `statu
 (2, 4, 'sepay', '2611220047556170', 1499750, 'success', 'b0e6f79e-e5d3-11f1-8895-0afffe87053b', NULL, 'CAPTURED', '20261122004755', '{\"data\":{\"id\":\"b0e6f79e-e5d3-11f1-8895-0afffe87053b\",\"customer_id\":null,\"order_id\":\"PAY127376B01D94F53352\",\"order_invoice_number\":\"2611220047556170\",\"order_status\":\"CAPTURED\",\"order_amount\":\"1499750.00\",\"order_currency\":\"VND\",\"order_description\":\"Thanh toan don hang DH261122DB7BA5\",\"authentication_status\":null,\"created_at\":\"2026-11-22 00:47:59\",\"updated_at\":\"2026-11-22 00:48:03\",\"transactions\":[{\"id\":\"b37b4ad4-e5d3-11f1-8895-0afffe87053b\",\"payment_method\":\"BANK_TRANSFER\",\"transaction_type\":\"PAYMENT\",\"transaction_amount\":\"1499750\",\"transaction_currency\":\"VND\",\"transaction_status\":\"APPROVED\",\"authentication_status\":\"AUTHENTICATION_SUCCESSFUL\",\"card_number\":null,\"card_holder_name\":null,\"card_expiry\":null,\"card_funding_method\":null,\"card_brand\":null,\"transaction_date\":\"2026-11-22 00:48:03\",\"transaction_last_updated_date\":\"2026-11-22 00:48:03\"}]}}', '2026-11-22 00:48:09', '2026-11-22 00:47:55', '2026-11-22 00:48:09'),
 (3, 9, 'sepay', 'TXN2611222298CFCD6864', 26225000, 'success', 'dd3ae768-e63c-11f1-8895-0afffe87053b', NULL, 'CAPTURED', '20261122132028', '{\"data\":{\"id\":\"dd3ae768-e63c-11f1-8895-0afffe87053b\",\"customer_id\":null,\"order_id\":\"PAY127376B0289C2D42AE\",\"order_invoice_number\":\"TXN2611222298CFCD6864\",\"order_status\":\"CAPTURED\",\"order_amount\":\"26225000.00\",\"order_currency\":\"VND\",\"order_description\":\"Thanh toan don hang DH261122CE28B0\",\"authentication_status\":null,\"created_at\":\"2026-11-22 13:20:50\",\"updated_at\":\"2026-11-22 13:21:06\",\"transactions\":[{\"id\":\"e649b7e1-e63c-11f1-8895-0afffe87053b\",\"payment_method\":\"BANK_TRANSFER\",\"transaction_type\":\"PAYMENT\",\"transaction_amount\":\"26225000\",\"transaction_currency\":\"VND\",\"transaction_status\":\"APPROVED\",\"authentication_status\":\"AUTHENTICATION_SUCCESSFUL\",\"card_number\":null,\"card_holder_name\":null,\"card_expiry\":null,\"card_funding_method\":null,\"card_brand\":null,\"transaction_date\":\"2026-11-22 13:21:06\",\"transaction_last_updated_date\":\"2026-11-22 13:21:06\"}]}}', '2026-11-22 13:21:13', '2026-11-22 13:20:28', '2026-11-22 13:21:13'),
 (4, 10, 'sepay', 'TXN26112272663F044F1B', 17599750, 'success', '0c0c6e23-e654-11f1-8895-0afffe87053b', NULL, 'CAPTURED', '20261122160647', '{\"data\":{\"id\":\"0c0c6e23-e654-11f1-8895-0afffe87053b\",\"customer_id\":null,\"order_id\":\"PAY127376B02B0A7CF154\",\"order_invoice_number\":\"TXN26112272663F044F1B\",\"order_status\":\"CAPTURED\",\"order_amount\":\"17599750.00\",\"order_currency\":\"VND\",\"order_description\":\"Thanh toan don hang DH26112269E6E2\",\"authentication_status\":null,\"created_at\":\"2026-11-22 16:06:47\",\"updated_at\":\"2026-11-22 16:06:54\",\"transactions\":[{\"id\":\"0fed8acd-e654-11f1-8895-0afffe87053b\",\"payment_method\":\"BANK_TRANSFER\",\"transaction_type\":\"PAYMENT\",\"transaction_amount\":\"17599750\",\"transaction_currency\":\"VND\",\"transaction_status\":\"APPROVED\",\"authentication_status\":\"AUTHENTICATION_SUCCESSFUL\",\"card_number\":null,\"card_holder_name\":null,\"card_expiry\":null,\"card_funding_method\":null,\"card_brand\":null,\"transaction_date\":\"2026-11-22 16:06:54\",\"transaction_last_updated_date\":\"2026-11-22 16:06:54\"}]}}', '2026-11-22 16:06:59', '2026-11-22 16:06:47', '2026-11-22 16:06:59'),
-(5, 11, 'sepay', 'TXN2611249BC277D5961A', 26225000, 'success', 'bc592f88-e7d0-11f1-8895-0afffe87053b', NULL, 'CAPTURED', '20261124133143', '{\"data\":{\"id\":\"bc592f88-e7d0-11f1-8895-0afffe87053b\",\"customer_id\":null,\"order_id\":\"PAY127376B052F585F049\",\"order_invoice_number\":\"TXN2611249BC277D5961A\",\"order_status\":\"CAPTURED\",\"order_amount\":\"26225000.00\",\"order_currency\":\"VND\",\"order_description\":\"Thanh toan don hang DH261124E24DE5\",\"authentication_status\":null,\"created_at\":\"2026-11-24 13:31:52\",\"updated_at\":\"2026-11-24 13:31:57\",\"transactions\":[{\"id\":\"bf7d71b6-e7d0-11f1-8895-0afffe87053b\",\"payment_method\":\"BANK_TRANSFER\",\"transaction_type\":\"PAYMENT\",\"transaction_amount\":\"26225000\",\"transaction_currency\":\"VND\",\"transaction_status\":\"APPROVED\",\"authentication_status\":\"AUTHENTICATION_SUCCESSFUL\",\"card_number\":null,\"card_holder_name\":null,\"card_expiry\":null,\"card_funding_method\":null,\"card_brand\":null,\"transaction_date\":\"2026-11-24 13:31:57\",\"transaction_last_updated_date\":\"2026-11-24 13:31:57\"}]}}', '2026-11-24 13:32:05', '2026-11-24 13:31:43', '2026-11-24 13:32:05');
+(5, 11, 'sepay', 'TXN2611249BC277D5961A', 26225000, 'success', 'bc592f88-e7d0-11f1-8895-0afffe87053b', NULL, 'CAPTURED', '20261124133143', '{\"data\":{\"id\":\"bc592f88-e7d0-11f1-8895-0afffe87053b\",\"customer_id\":null,\"order_id\":\"PAY127376B052F585F049\",\"order_invoice_number\":\"TXN2611249BC277D5961A\",\"order_status\":\"CAPTURED\",\"order_amount\":\"26225000.00\",\"order_currency\":\"VND\",\"order_description\":\"Thanh toan don hang DH261124E24DE5\",\"authentication_status\":null,\"created_at\":\"2026-11-24 13:31:52\",\"updated_at\":\"2026-11-24 13:31:57\",\"transactions\":[{\"id\":\"bf7d71b6-e7d0-11f1-8895-0afffe87053b\",\"payment_method\":\"BANK_TRANSFER\",\"transaction_type\":\"PAYMENT\",\"transaction_amount\":\"26225000\",\"transaction_currency\":\"VND\",\"transaction_status\":\"APPROVED\",\"authentication_status\":\"AUTHENTICATION_SUCCESSFUL\",\"card_number\":null,\"card_holder_name\":null,\"card_expiry\":null,\"card_funding_method\":null,\"card_brand\":null,\"transaction_date\":\"2026-11-24 13:31:57\",\"transaction_last_updated_date\":\"2026-11-24 13:31:57\"}]}}', '2026-11-24 13:32:05', '2026-11-24 13:31:43', '2026-11-24 13:32:05'),
+(6, 19, 'sepay', 'TXN2611271EC0BB64B226', 12475000, 'pending', NULL, NULL, NULL, '20261127221552', NULL, NULL, '2026-11-27 22:15:52', '2026-11-27 22:15:52');
 
 -- --------------------------------------------------------
 
@@ -418,11 +466,11 @@ CREATE TABLE `products` (
 
 INSERT INTO `products` (`id`, `category_id`, `name`, `slug`, `sku`, `short_description`, `description`, `price`, `sale_price`, `stock`, `image`, `status`, `is_featured`, `has_variants`, `created_at`, `updated_at`, `deleted_at`) VALUES
 (29, 6, 'ZEBRASÄV pendant lamp, white/plastic, 18\"', 'zebrasv-pendant-lamp-whiteplastic-18', 'SP0029', 'ZEBRASÄV pendant lamp, white/plastic, 18\" ZEBRASÄV pendant lamp surprises – an asymmetrical shape that looks different from all angles, made from plastic, of which as least 50% is recycled, and just as decorative on or off. Love it for many years!...', 'ZEBRASÄV pendant lamp, white/plastic, 18\" ZEBRASÄV pendant lamp surprises – an asymmetrical shape that looks different from all angles, made from plastic, of which as least 50% is recycled, and just as decorative on or off. Love it for many years!', 249750, NULL, 10, 'https://www.ikea.com/us/en/images/p/26c1ffc49d0915a9/zebrasaev-pendant-lamp-white-plastic/PE933702.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(30, 6, 'ZEBRASÄV pendant lamp, brown/paper, 14\"', 'zebrasv-pendant-lamp-brownpaper-14', 'SP0030', 'ZEBRASÄV pendant lamp, brown/paper, 14\" ZEBRASÄV pendant lamp surprises with its playful asymmetrical shape that looks different based on where you stand. Made from paper pulp, of which as least 90% is recycled, and just as decorative on or off....', 'ZEBRASÄV pendant lamp, brown/paper, 14\" ZEBRASÄV pendant lamp surprises with its playful asymmetrical shape that looks different based on where you stand. Made from paper pulp, of which as least 90% is recycled, and just as decorative on or off.', 299750, NULL, 10, 'https://www.ikea.com/us/en/images/p/76853593a26ddf5b/sandkorn-havsdjup-pendant-lamp-handmade-rattan-black/PH207263.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(31, 11, 'ZAMIOCULCAS potted plant, Aroid palm, 6\"', 'zamioculcas-potted-plant-aroid-palm-6', 'SP0031', 'ZAMIOCULCAS potted plant, Aroid palm, 6\" Plants are perfect roommates – invite them into your home and create your own green oasis where you can wind down from the hustle and bustle of life. And they’re also quiet when it’s time to go to sleep!...', 'ZAMIOCULCAS potted plant, Aroid palm, 6\" Plants are perfect roommates – invite them into your home and create your own green oasis where you can wind down from the hustle and bustle of life. And they’re also quiet when it’s time to go to sleep!', 324750, NULL, 9, 'https://www.ikea.com/us/en/images/p/73b9428a65de9752/zamioculcas-potted-plant-aroid-palm/PE914138.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(30, 6, 'ZEBRASÄV pendant lamp, brown/paper, 14\"', 'zebrasv-pendant-lamp-brownpaper-14', 'SP0030', 'ZEBRASÄV pendant lamp, brown/paper, 14\" ZEBRASÄV pendant lamp surprises with its playful asymmetrical shape that looks different based on where you stand. Made from paper pulp, of which as least 90% is recycled, and just as decorative on or off....', 'ZEBRASÄV pendant lamp, brown/paper, 14\" ZEBRASÄV pendant lamp surprises with its playful asymmetrical shape that looks different based on where you stand. Made from paper pulp, of which as least 90% is recycled, and just as decorative on or off.', 299750, NULL, 9, 'https://www.ikea.com/us/en/images/p/76853593a26ddf5b/sandkorn-havsdjup-pendant-lamp-handmade-rattan-black/PH207263.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(31, 11, 'ZAMIOCULCAS potted plant, Aroid palm, 6\"', 'zamioculcas-potted-plant-aroid-palm-6', 'SP0031', 'ZAMIOCULCAS potted plant, Aroid palm, 6\" Plants are perfect roommates – invite them into your home and create your own green oasis where you can wind down from the hustle and bustle of life. And they’re also quiet when it’s time to go to sleep!...', 'ZAMIOCULCAS potted plant, Aroid palm, 6\" Plants are perfect roommates – invite them into your home and create your own green oasis where you can wind down from the hustle and bustle of life. And they’re also quiet when it’s time to go to sleep!', 324750, NULL, 8, 'https://www.ikea.com/us/en/images/p/73b9428a65de9752/zamioculcas-potted-plant-aroid-palm/PE914138.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (32, 16, 'YUPPIENALLE holder for mobile phone, gray', 'yuppienalle-holder-for-mobile-phone-gray', 'SP0032', 'YUPPIENALLE holder for mobile phone, gray This small and foldable holder for mobile phones allow you to have your hands free when watching films or having virtual meetings. Perfect when travelling and easy to grab and bring with you in a flash....', 'YUPPIENALLE holder for mobile phone, gray This small and foldable holder for mobile phones allow you to have your hands free when watching films or having virtual meetings. Perfect when travelling and easy to grab and bring with you in a flash.', 24750, NULL, 10, 'https://www.ikea.com/us/en/images/p/3410c31871aebc59/yuppienalle-holder-for-mobile-phone-gray/PH182934.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (33, 11, 'YUCCA ELEPHANTIPES potted plant, Spineless yucca/2-stem, 9 ½\"', 'yucca-elephantipes-potted-plant-spineless-yucca2-stem-9', 'SP0033', 'YUCCA ELEPHANTIPES potted plant, Spineless yucca/2-stem, 9 ½\" Plants are wonderful roommates that make your home more vibrant. This easy-to-care plant withstands dry environments – so it’s also ideal when you want to enjoy greenery in the office....', 'YUCCA ELEPHANTIPES potted plant, Spineless yucca/2-stem, 9 ½\" Plants are wonderful roommates that make your home more vibrant. This easy-to-care plant withstands dry environments – so it’s also ideal when you want to enjoy greenery in the office.', 749750, NULL, 10, 'https://www.ikea.com/us/en/images/p/20b6e8fb4e3a06d/yucca-elephantipes-potted-plant-spineless-yucca-2-stem/PE895580.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(34, 22, 'YTTERVÅG nightstand, gray-brown, 181/2x161/8\"', 'yttervg-nightstand-gray-brown-1812x1618', 'SP0034', 'YTTERVÅG nightstand, gray-brown, 181/2x161/8\" This bedside table in solid wood stands sturdy on metal legs and has lots of room for everything you want close at hand in the deep drawer and open shelf. Matches YTTERVÅG four-poster bed perfectly. Plent...', 'YTTERVÅG nightstand, gray-brown, 181/2x161/8\" This bedside table in solid wood stands sturdy on metal legs and has lots of room for everything you want close at hand in the deep drawer and open shelf. Matches YTTERVÅG four-poster bed perfectly. Plenty of room in the large drawer for your belongings.', 3749750, NULL, 10, 'https://www.ikea.com/us/en/images/p/3ea1b4929adc1965/storemolla-nightstand-gray-brown-stained/PE982335.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(34, 22, 'YTTERVÅG nightstand, gray-brown, 181/2x161/8\"', 'yttervg-nightstand-gray-brown-1812x1618', 'SP0034', 'YTTERVÅG nightstand, gray-brown, 181/2x161/8\" This bedside table in solid wood stands sturdy on metal legs and has lots of room for everything you want close at hand in the deep drawer and open shelf. Matches YTTERVÅG four-poster bed perfectly. Plent...', 'YTTERVÅG nightstand, gray-brown, 181/2x161/8\" This bedside table in solid wood stands sturdy on metal legs and has lots of room for everything you want close at hand in the deep drawer and open shelf. Matches YTTERVÅG four-poster bed perfectly. Plenty of room in the large drawer for your belongings.', 3749750, NULL, 9, 'https://www.ikea.com/us/en/images/p/3ea1b4929adc1965/storemolla-nightstand-gray-brown-stained/PE982335.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (35, 26, 'YTTERVÅG four-poster bed frame, gray-brown, King', 'yttervg-four-poster-bed-frame-gray-brown-king', 'SP0035', 'YTTERVÅG four-poster bed frame, gray-brown, King You don’t need to live in a castle to sleep like royalty. The timeless and simple expression of this four-poster bed frame in a Scandinavian style fits just as well in a modern home....', 'YTTERVÅG four-poster bed frame, gray-brown, King You don’t need to live in a castle to sleep like royalty. The timeless and simple expression of this four-poster bed frame in a Scandinavian style fits just as well in a modern home.', 17225000, NULL, 10, 'https://www.ikea.com/us/en/images/p/6f4ae0e91f28923c/yttervag-four-poster-bed-frame-gray-brown/PE982037.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (36, 26, 'YTTERVÅG four-poster bed frame, gray-brown/Lyngör white, Queen', 'yttervg-four-poster-bed-frame-gray-brownlyngr-white-queen', 'SP0036', 'YTTERVÅG four-poster bed frame, gray-brown/Lyngör white, Queen The timeless look of YTTERVÅG four-poster bed frame fits a modern home, yet allows you to sleep like royalty – and LYNGÖR mattress base gives extra height and helps your mattress keep its...', 'YTTERVÅG four-poster bed frame, gray-brown/Lyngör white, Queen The timeless look of YTTERVÅG four-poster bed frame fits a modern home, yet allows you to sleep like royalty – and LYNGÖR mattress base gives extra height and helps your mattress keep its shape for longer.', 20475000, NULL, 10, 'https://www.ikea.com/us/en/images/p/4f1d41873062a8dc/yttervag-four-poster-bed-frame-gray-brown-lyngoer-white/PE953124.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (37, 26, 'YTTERVÅG four-poster bed frame, gray-brown/Lyngör white, King', 'yttervg-four-poster-bed-frame-gray-brownlyngr-white-king', 'SP0037', 'YTTERVÅG four-poster bed frame, gray-brown/Lyngör white, King You don’t need to live in a castle to sleep like royalty. The timeless and simple expression of this four-poster bed frame in a Scandinavian style fits just as well in a modern home....', 'YTTERVÅG four-poster bed frame, gray-brown/Lyngör white, King You don’t need to live in a castle to sleep like royalty. The timeless and simple expression of this four-poster bed frame in a Scandinavian style fits just as well in a modern home.', 24725000, NULL, 10, 'https://www.ikea.com/us/en/images/p/4f1d41873062a8dc/yttervag-four-poster-bed-frame-gray-brown-lyngoer-white/PE953124.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
@@ -432,15 +480,15 @@ INSERT INTO `products` (`id`, `category_id`, `name`, `slug`, `sku`, `short_descr
 (41, 30, 'YTBERG / TRÅDFRI lighting kit, white', 'ytberg-trdfri-lighting-kit-white', 'SP0041', 'YTBERG / TRÅDFRI lighting kit, white You can bend, angle and move this slim lamp sideways to direct the soft light precisely over your cabinet or wardrobe. A perfect choice if there is little space between the top and the ceiling. Spreads a soft ligh...', 'YTBERG / TRÅDFRI lighting kit, white You can bend, angle and move this slim lamp sideways to direct the soft light precisely over your cabinet or wardrobe. A perfect choice if there is little space between the top and the ceiling. Spreads a soft light that creates a cosy atmosphere in the room.', 2149750, NULL, 7, 'https://www.ikea.com/us/en/images/p/19e2760789227493/tradfri-starter-kit-smart-wireless-dimmable-white-spectrum/PE756272.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (42, 6, 'YTBERG cabinet lighting, white/dimmable', 'ytberg-cabinet-lighting-whitedimmable', 'SP0042', 'YTBERG cabinet lighting, white/dimmable You can bend, angle and move this slim lamp sideways to direct the soft light precisely over your cabinet or wardrobe. A perfect choice if there is little space between the top and the ceiling. Spreads a soft l...', 'YTBERG cabinet lighting, white/dimmable You can bend, angle and move this slim lamp sideways to direct the soft light precisely over your cabinet or wardrobe. A perfect choice if there is little space between the top and the ceiling. Spreads a soft light that creates a cosy atmosphere in the room.', 450000, NULL, 10, 'https://www.ikea.com/us/en/images/p/78550345d93debdc/ytberg-cabinet-lighting-white-dimmable/PE856686.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (43, 6, 'YTBERG cabinet lighting, black/dimmable', 'ytberg-cabinet-lighting-blackdimmable', 'SP0043', 'YTBERG cabinet lighting, black/dimmable You can bend, angle and move this slim lamp sideways to direct the soft light precisely over your cabinet or wardrobe. A perfect choice if there is little space between the top and the ceiling. Spreads a soft l...', 'YTBERG cabinet lighting, black/dimmable You can bend, angle and move this slim lamp sideways to direct the soft light precisely over your cabinet or wardrobe. A perfect choice if there is little space between the top and the ceiling. Spreads a soft light that creates a cosy atmosphere in the room.', 450000, NULL, 10, 'https://www.ikea.com/us/en/images/p/720d5586391b478b/ytberg-cabinet-lighting-black-dimmable/PE856628.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(44, 37, 'YNGVAR chair, anthracite', 'yngvar-chair-anthracite', 'SP0044', 'YNGVAR chair, anthracite The soft and rounded back support feels like a nice embrace and makes the chair easy to hang on the table edge when you want to sweep the floor after dinner. You sit comfortably thanks to the generous size and the soft rounde...', 'YNGVAR chair, anthracite The soft and rounded back support feels like a nice embrace and makes the chair easy to hang on the table edge when you want to sweep the floor after dinner. You sit comfortably thanks to the generous size and the soft rounded shape of the seat and back support.', 3625000, NULL, 10, 'https://www.ikea.com/us/en/images/p/7201cb4dbd5f9141/yngvar-chair-anthracite/PE846701.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(44, 37, 'YNGVAR chair, anthracite', 'yngvar-chair-anthracite', 'SP0044', 'YNGVAR chair, anthracite The soft and rounded back support feels like a nice embrace and makes the chair easy to hang on the table edge when you want to sweep the floor after dinner. You sit comfortably thanks to the generous size and the soft rounde...', 'YNGVAR chair, anthracite The soft and rounded back support feels like a nice embrace and makes the chair easy to hang on the table edge when you want to sweep the floor after dinner. You sit comfortably thanks to the generous size and the soft rounded shape of the seat and back support.', 3625000, NULL, 9, 'https://www.ikea.com/us/en/images/p/7201cb4dbd5f9141/yngvar-chair-anthracite/PE846701.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (45, 41, 'YLLEVAD frame, black, 5x7\"', 'yllevad-frame-black-5x7', 'SP0045', 'YLLEVAD frame, black, 5x7\" Together with ALFTA adhesive hook, you can hang this frame without nails or screws. The snap-on function allows you to easily and quickly replace your pictures whenever you like. The frame is made of plastic, which makes it...', 'YLLEVAD frame, black, 5x7\" Together with ALFTA adhesive hook, you can hang this frame without nails or screws. The snap-on function allows you to easily and quickly replace your pictures whenever you like. The frame is made of plastic, which makes it strong, lightweight and easier to handle.', 37250, NULL, 10, 'https://www.ikea.com/us/en/images/p/3dab171a61dc334b/yllevad-frame-black/PE770938.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (46, 41, 'YLLEVAD frame, black, 8 ¼x11 ¾\"', 'yllevad-frame-black-8-x11', 'SP0046', 'YLLEVAD frame, black, 8 ¼x11 ¾\" This frame is ideal to use with ALFTA adhesive hook. With the hook you can easily hang the frame without nails or screws and decorate your walls with pictures. Can be used hanging or standing, both horizontally and ver...', 'YLLEVAD frame, black, 8 ¼x11 ¾\" This frame is ideal to use with ALFTA adhesive hook. With the hook you can easily hang the frame without nails or screws and decorate your walls with pictures. Can be used hanging or standing, both horizontally and vertically, to fit in the space available.', 124750, NULL, 10, 'https://www.ikea.com/us/en/images/p/786f019f8c02795e/yllevad-frame-black/PE781591.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (47, 41, 'YLLEVAD Collage frame for 4 photos, black', 'yllevad-collage-frame-for-4-photos-black', 'SP0047', 'YLLEVAD Collage frame for 4 photos, black. The smart snap-on function allows you to easily fix your pictures in place, and quickly replace them whenever you like. Holds 4 pictures so you can create your own personal collage....', 'YLLEVAD Collage frame for 4 photos, black. The smart snap-on function allows you to easily fix your pictures in place, and quickly replace them whenever you like. Holds 4 pictures so you can create your own personal collage.', 124750, NULL, 10, 'https://www.ikea.com/us/en/images/p/143dfae56ce8b387/roedalm-frame-for-9-pictures-black/PE924271.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (48, 41, 'YLLEVAD art card, flowers-blooming, 4x6\"', 'yllevad-art-card-flowers-blooming-4x6', 'SP0048', 'YLLEVAD art card, flowers-blooming, 4x6\" Artwork makes a difference and adds a personal touch to your home, even if you’re not the artist. With YLLEVAD art cards you can create your own mini-gallery on a wall or shelf in a flash. Motif created by Iri...', 'YLLEVAD art card, flowers-blooming, 4x6\" Artwork makes a difference and adds a personal touch to your home, even if you’re not the artist. With YLLEVAD art cards you can create your own mini-gallery on a wall or shelf in a flash. Motif created by Irika Sandström and Sophie Wiking Ekman.', 24750, NULL, 10, 'https://www.ikea.com/us/en/images/products/vaexbo-art-card-wild-herbs__1416537_pe975626_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(49, 49, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', 'ygsbo-over-the-range-convection-microwave-stainless-steel-30', 'SP0049', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortles...', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortlessly.', 12475000, NULL, 8, 'https://www.ikea.com/us/en/images/p/4e64d079ae3aa31b/ygsbo-over-the-range-convection-microwave-stainless-steel/PE970369.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(49, 49, 'YGSBO over-the-range convection microwave, Stainless steel, 30\"', 'ygsbo-over-the-range-convection-microwave-stainless-steel-30', 'SP0049', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortles...', 'YGSBO over-the-range convection microwave, Stainless steel, 30\" A microwave with convection function and range hood all in one efficient appliance – a perfect choice when you’re tight for space. Best of all? The interior surface wipes clean effortlessly.', 12475000, NULL, 6, 'https://www.ikea.com/us/en/images/p/4e64d079ae3aa31b/ygsbo-over-the-range-convection-microwave-stainless-steel/PE970369.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (50, 22, 'VUKU wardrobe, white, 291/8x201/8x585/8\"', 'vuku-wardrobe-white-2918x2018x5858', 'SP0050', 'VUKU wardrobe, white, 291/8x201/8x585/8\" Inspired by the ingenuity of tents, we worked with tent suppliers to develop this wardrobe. Great for seasonal clothes or when you need to bring your wardrobe with you. Roll it and bring it along. Easy to brin...', 'VUKU wardrobe, white, 291/8x201/8x585/8\" Inspired by the ingenuity of tents, we worked with tent suppliers to develop this wardrobe. Great for seasonal clothes or when you need to bring your wardrobe with you. Roll it and bring it along. Easy to bring home since it is roll packed.', 324750, NULL, 10, 'https://www.ikea.com/us/en/images/p/906d1eeeb66890e/vuku-wardrobe-white/PH196296.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(51, 41, 'VRIGSTAD mirror, sedge, 24 ¾\"', 'vrigstad-mirror-sedge-24', 'SP0051', 'VRIGSTAD mirror, sedge, 24 ¾\" Embrace nature! This mirror in hand-woven rattan gives your room a depth that makes it feel extra vibrant. Whether you hang up one, several or combine them with paintings, they make a strong impression. Provided with saf...', 'VRIGSTAD mirror, sedge, 24 ¾\" Embrace nature! This mirror in hand-woven rattan gives your room a depth that makes it feel extra vibrant. Whether you hang up one, several or combine them with paintings, they make a strong impression. Provided with safety film - reduces damage if glass is broken.', 1499750, NULL, 8, 'https://www.ikea.com/us/en/images/p/4b6514ac1d035ed6/hovet-mirror-gold/PE985737.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(52, 60, 'VRETSTORP sleeper sofa, Kilanda light beige', 'vretstorp-sleeper-sofa-kilanda-light-beige', 'SP0052', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes ope...', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open.', 26225000, NULL, 7, 'https://www.ikea.com/us/en/images/p/181caf7533def9fb/kivik-1-seat-sleeper-sofa-kelinge-gray-turquoise/PE890987.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(51, 41, 'VRIGSTAD mirror, sedge, 24 ¾\"', 'vrigstad-mirror-sedge-24', 'SP0051', 'VRIGSTAD mirror, sedge, 24 ¾\" Embrace nature! This mirror in hand-woven rattan gives your room a depth that makes it feel extra vibrant. Whether you hang up one, several or combine them with paintings, they make a strong impression. Provided with saf...', 'VRIGSTAD mirror, sedge, 24 ¾\" Embrace nature! This mirror in hand-woven rattan gives your room a depth that makes it feel extra vibrant. Whether you hang up one, several or combine them with paintings, they make a strong impression. Provided with safety film - reduces damage if glass is broken.', 1499750, NULL, 7, 'https://www.ikea.com/us/en/images/p/4b6514ac1d035ed6/hovet-mirror-gold/PE985737.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(52, 60, 'VRETSTORP sleeper sofa, Kilanda light beige', 'vretstorp-sleeper-sofa-kilanda-light-beige', 'SP0052', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes ope...', 'VRETSTORP sleeper sofa, Kilanda light beige This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open.', 26225000, NULL, 6, 'https://www.ikea.com/us/en/images/p/181caf7533def9fb/kivik-1-seat-sleeper-sofa-kelinge-gray-turquoise/PE890987.jpg?f=xl', 'active', 1, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (53, 60, 'VRETSTORP sleeper sofa, Kilanda dark blue', 'vretstorp-sleeper-sofa-kilanda-dark-blue', 'SP0053', 'VRETSTORP sleeper sofa, Kilanda dark blue This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open....', 'VRETSTORP sleeper sofa, Kilanda dark blue This sleeper sofa makes it easy to have a good night\'s sleep. Effortless to convert and with practical storage for bedding and pajamas. But most importantly – the comfort makes it hard to keep your eyes open.', 26225000, NULL, 10, 'https://www.ikea.com/us/en/images/products/vretstorp-sleeper-sofa-kilanda-dark-blue__1155335_pe886565_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (54, 60, 'VRETSTORP cover for sleeper sofa, Hakebo dark gray', 'vretstorp-cover-for-sleeper-sofa-hakebo-dark-gray', 'SP0054', 'VRETSTORP cover for sleeper sofa, Hakebo dark gray This cover will make your sofa even more inviting. It is soft and smooth with a slight structure - and the cover is also easy to remove and machine wash if needed....', 'VRETSTORP cover for sleeper sofa, Hakebo dark gray This cover will make your sofa even more inviting. It is soft and smooth with a slight structure - and the cover is also easy to remove and machine wash if needed.', 2475000, NULL, 10, 'https://www.ikea.com/us/en/images/products/vretstorp-cover-for-sleeper-sofa-hakebo-dark-gray__1194800_pe902059_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (55, 49, 'VOXTORP door, matte white, 24x40\"', 'voxtorp-door-matte-white-24x40', 'SP0055', 'VOXTORP door, matte white, 24x40\" VOXTORP fronts with matte white surface create a modern look and give the impression of light and space. Integrated handles blend perfectly into the design enhancing the minimalist expression. The depth of the handle...', 'VOXTORP door, matte white, 24x40\" VOXTORP fronts with matte white surface create a modern look and give the impression of light and space. Integrated handles blend perfectly into the design enhancing the minimalist expression. The depth of the handle makes it easy to open and close the door.', 6775000, NULL, 10, 'https://www.ikea.com/us/en/images/products/voxtorp-door-matte-white__0638953_pe699267_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
@@ -458,14 +506,15 @@ INSERT INTO `products` (`id`, `category_id`, `name`, `slug`, `sku`, `short_descr
 (67, 92, 'VÖRDA vegetable knife, black, 6\"', 'vrda-vegetable-knife-black-6', 'SP0067', 'VÖRDA vegetable knife, black, 6\" Why is it smart to have a special knife for vegetables? The answer is simple – the indentations on the blade prevent carrot slices from sticking when you slice. A small detail that makes a big difference. Materials in...', 'VÖRDA vegetable knife, black, 6\" Why is it smart to have a special knife for vegetables? The answer is simple – the indentations on the blade prevent carrot slices from sticking when you slice. A small detail that makes a big difference. Materials in the handle provide a firm grip.', 324750, NULL, 10, 'https://www.ikea.com/us/en/images/products/voerda-vegetable-knife-black__0710385_pe727513_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (68, 92, 'VÖRDA utility knife, black, 6\"', 'vrda-utility-knife-black-6', 'SP0068', 'VÖRDA utility knife, black, 6\" Cut, trim and dice – a utility knife can handle most jobs. Sharp, well-balanced and with an ergonomically shaped handle that gives you a good grip. For easy slicing and trimming. Materials in the handle provide a firm g...', 'VÖRDA utility knife, black, 6\" Cut, trim and dice – a utility knife can handle most jobs. Sharp, well-balanced and with an ergonomically shaped handle that gives you a good grip. For easy slicing and trimming. Materials in the handle provide a firm grip.', 224750, NULL, 10, 'https://www.ikea.com/us/en/images/products/voerda-utility-knife-black__0710376_pe727504_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (69, 92, 'VÖRDA 3-piece knife set', 'vrda-3-piece-knife-set', 'SP0069', 'VÖRDA 3-piece knife set This knife set is a whiz in the kitchen – from chopping onions to cutting up a fried chicken fillet or an oven-baked head of cauliflower. There’s also a paring knife in the same series for the small jobs....', 'VÖRDA 3-piece knife set This knife set is a whiz in the kitchen – from chopping onions to cutting up a fried chicken fillet or an oven-baked head of cauliflower. There’s also a paring knife in the same series for the small jobs.', 624750, NULL, 10, 'https://www.ikea.com/us/en/images/products/voerda-3-piece-knife-set__0448546_pe598209_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(70, 16, 'VIVALLA tablet stand, bamboo, 101/4x63/4\"', 'vivalla-tablet-stand-bamboo-1014x634', 'SP0070', 'VIVALLA tablet stand, bamboo, 101/4x63/4\" This bamboo holder creates a warm expression in your kitchen. Place it on the countertop or hang it on KUNGSFORS or SUNNERSTA rail to free up space and put your tablet or cookbook at eye-height....', 'VIVALLA tablet stand, bamboo, 101/4x63/4\" This bamboo holder creates a warm expression in your kitchen. Place it on the countertop or hang it on KUNGSFORS or SUNNERSTA rail to free up space and put your tablet or cookbook at eye-height.', 374750, NULL, 10, 'https://www.ikea.com/us/en/images/products/vivalla-tablet-stand-bamboo__0713732_pe729730_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(70, 16, 'VIVALLA tablet stand, bamboo, 101/4x63/4\"', 'vivalla-tablet-stand-bamboo-1014x634', 'SP0070', 'VIVALLA tablet stand, bamboo, 101/4x63/4\" This bamboo holder creates a warm expression in your kitchen. Place it on the countertop or hang it on KUNGSFORS or SUNNERSTA rail to free up space and put your tablet or cookbook at eye-height....', 'VIVALLA tablet stand, bamboo, 101/4x63/4\" This bamboo holder creates a warm expression in your kitchen. Place it on the countertop or hang it on KUNGSFORS or SUNNERSTA rail to free up space and put your tablet or cookbook at eye-height.', 374750, NULL, 9, 'https://www.ikea.com/us/en/images/products/vivalla-tablet-stand-bamboo__0713732_pe729730_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (71, 99, 'VITVAL loft bed frame with desk top, white/light gray, Twin', 'vitval-loft-bed-frame-with-desk-top-whitelight-gray-twin', 'SP0071', 'VITVAL loft bed frame with desk top, white/light gray, Twin It is the details that make this loft bed unique. Soft shapes, fabric guardrails and a desk with a practical pegboard. You can also accessorize with products from the MÖJLIGHET and SKÅDIS se...', 'VITVAL loft bed frame with desk top, white/light gray, Twin It is the details that make this loft bed unique. Soft shapes, fabric guardrails and a desk with a practical pegboard. You can also accessorize with products from the MÖJLIGHET and SKÅDIS series.', 7475000, NULL, 10, 'https://www.ikea.com/us/en/images/products/vitval-loft-bed-frame-with-desk-top-white-light-gray__0688141_pe722337_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (72, 99, 'VITVAL loft bed frame, white/light gray, Twin', 'vitval-loft-bed-frame-whitelight-gray-twin', 'SP0072', 'VITVAL loft bed frame, white/light gray, Twin It is the details that make this loft bed unique. Soft shapes, sturdy ladder and fabric guardrails with yellow accents. You can also dress it up with bedlinens and accessories from the MÖJLIGHET series....', 'VITVAL loft bed frame, white/light gray, Twin It is the details that make this loft bed unique. Soft shapes, sturdy ladder and fabric guardrails with yellow accents. You can also dress it up with bedlinens and accessories from the MÖJLIGHET series.', 6225000, NULL, 10, 'https://www.ikea.com/us/en/images/products/vitval-loft-bed-frame-white-light-gray__0688128_pe722324_s5.jpg?f=xl', 'active', 0, 1, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (73, 75, 'VISSLAÅN drawer organizers, set of 3, gray', 'visslan-drawer-organizers-set-of-3-gray', 'SP0073', 'VISSLAÅN drawer organizers, set of 3, gray Open your drawers and treat yourself to some inner peace. This set of 3 organizers is ideal for holding toothbrushes and other things you need nearby. Pairs perfectly with other VISSLAÅN drawer organizers....', 'VISSLAÅN drawer organizers, set of 3, gray Open your drawers and treat yourself to some inner peace. This set of 3 organizers is ideal for holding toothbrushes and other things you need nearby. Pairs perfectly with other VISSLAÅN drawer organizers.', 174750, NULL, 10, 'https://www.ikea.com/us/en/images/products/visslaan-drawer-organizers-set-of-3-gray__1499227_pe1006532_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (74, 60, 'VISKAFORS sofa, Lejde light beige/brown', 'viskafors-sofa-lejde-light-beigebrown', 'SP0074', 'VISKAFORS sofa, Lejde light beige/brown VISKAFORS is a sofa that becomes a statement piece in the room. The classic design has generous, inviting shapes – and when you sink into the deep soft seat, the sofa gives you an embracing feel....', 'VISKAFORS sofa, Lejde light beige/brown VISKAFORS is a sofa that becomes a statement piece in the room. The classic design has generous, inviting shapes – and when you sink into the deep soft seat, the sofa gives you an embracing feel.', 31225000, NULL, 10, 'https://www.ikea.com/us/en/images/products/viskafors-sofa-lejde-light-beige-brown__1088069_pe861044_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (75, 60, 'VISKAFORS loveseat, Lejde light beige/brown', 'viskafors-loveseat-lejde-light-beigebrown', 'SP0075', 'VISKAFORS loveseat, Lejde light beige/brown VISKAFORS is a sofa that becomes a statement piece in the room. The classic design has generous, inviting shapes – and when you sink into the deep soft seat, the sofa gives you an embracing feel....', 'VISKAFORS loveseat, Lejde light beige/brown VISKAFORS is a sofa that becomes a statement piece in the room. The classic design has generous, inviting shapes – and when you sink into the deep soft seat, the sofa gives you an embracing feel.', 28725000, NULL, 10, 'https://www.ikea.com/us/en/images/products/viskafors-loveseat-lejde-light-beige-brown__1088057_pe861046_s5.jpg?f=xl', 'active', 0, 0, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
 (76, 60, 'VISKAFORS 1.5-seat armchair, Lejde light beige/birch', 'viskafors-15-seat-armchair-lejde-light-beigebirch', 'SP0076', 'VISKAFORS 1.5-seat armchair, Lejde light beige/birch VISKAFORS is an armchair that becomes a statement piece in the room. The classic design has generous, inviting shapes – and when you sink into the deep soft seat, the sofa gives you an embracing fe...', 'VISKAFORS 1.5-seat armchair, Lejde light beige/birch VISKAFORS is an armchair that becomes a statement piece in the room. The classic design has generous, inviting shapes – and when you sink into the deep soft seat, the sofa gives you an embracing feel.', 0, NULL, 20, 'https://www.ikea.com/us/en/images/products/viskafors-1-5-seat-armchair-lejde-light-beige-birch__1088077_pe861049_s5.jpg?f=xl', 'active', 0, 1, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
-(77, 41, 'VISBÄCK Poster hanger, bamboo, 15 3/4\"', 'visbck-poster-hanger-bamboo-15-34', 'SP0077', 'VISBÄCK Poster hanger, bamboo, 15 3/4\". With the two included bars, you can choose to have one on the top and one on the bottom of your chosen poster, either you can have the poster hanger only on the top, and then you can have two different motifs....', 'VISBÄCK Poster hanger, bamboo, 15 3/4\". With the two included bars, you can choose to have one on the top and one on the bottom of your chosen poster, either you can have the poster hanger only on the top, and then you can have two different motifs.', 199750, NULL, 0, 'https://www.ikea.com/us/en/images/products/visbaeck-poster-hanger-bamboo__0661105_pe711340_s5.jpg?f=xl', 'active', 0, 1, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL);
+(77, 41, 'VISBÄCK Poster hanger, bamboo, 15 3/4\"', 'visbck-poster-hanger-bamboo-15-34', 'SP0077', 'VISBÄCK Poster hanger, bamboo, 15 3/4\". With the two included bars, you can choose to have one on the top and one on the bottom of your chosen poster, either you can have the poster hanger only on the top, and then you can have two different motifs....', 'VISBÄCK Poster hanger, bamboo, 15 3/4\". With the two included bars, you can choose to have one on the top and one on the bottom of your chosen poster, either you can have the poster hanger only on the top, and then you can have two different motifs.', 199750, NULL, 0, 'https://www.ikea.com/us/en/images/products/visbaeck-poster-hanger-bamboo__0661105_pe711340_s5.jpg?f=xl', 'active', 0, 1, '2026-11-21 23:06:04', '2026-11-21 23:06:04', NULL),
+(78, 60, 'UPPLAND Armchair', 'uppland-armchair', NULL, NULL, 'You know the feeling when you sit, kick back or hang out in an armchair, rather than on it. That’s how embracing this deep, generous armchair is, your new favorite place for cozy evenings and lazy days!', 11000000, NULL, 30, 'https://www.ikea.com/us/en/images/p/6fbb0488a9aec41f/uppland-armchair-hakebo-dark-gray/PE920368.jpg?f=xl', 'active', 1, 1, '2026-11-28 00:33:22', '2026-11-28 00:34:05', NULL);
 
 -- --------------------------------------------------------
 
@@ -652,7 +701,8 @@ INSERT INTO `product_options` (`id`, `product_id`, `name`, `position`, `deleted_
 (2, 72, 'Phụ kiện', 1, '2026-11-26 00:23:20'),
 (3, 77, 'Màu', 0, NULL),
 (4, 76, 'Màu', 0, NULL),
-(5, 76, 'kích thước', 1, NULL);
+(5, 76, 'kích thước', 1, NULL),
+(6, 78, 'Màu', 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -684,7 +734,10 @@ INSERT INTO `product_option_values` (`id`, `option_id`, `value`, `position`, `de
 (10, 5, '2m', 0, NULL),
 (11, 5, '1.5m', 1, NULL),
 (12, 4, 'Cam', 5, NULL),
-(13, 5, '3m', 2, NULL);
+(13, 5, '3m', 2, NULL),
+(14, 6, 'Xám đen', 0, NULL),
+(15, 6, 'Xám xanh', 1, NULL),
+(16, 6, 'Sọc', 2, NULL);
 
 -- --------------------------------------------------------
 
@@ -786,7 +839,10 @@ INSERT INTO `product_variants` (`id`, `product_id`, `option_key`, `title`, `sku`
 (53, 77, '4', 'Nâu', 'SP0077-NAU', 199750, NULL, 0, NULL, NULL, NULL, '2026-11-26 00:27:21', '2026-11-26 00:27:21'),
 (54, 76, '5', 'Be', 'SP0076-BE', 19975000, NULL, 3, NULL, 'https://www.ikea.com/us/en/images/p/2c588312dcb46b20/vinterfint-decoration-santa-claus-sitting-green-stripe/PE1021955.jpg?f=xl', '2026-11-26 10:13:05', '2026-11-26 01:08:08', '2026-11-26 10:04:37'),
 (61, 76, '5-11', 'Be / 1.5m', 'SP0076-MAU-BE-KICH-THUOC-1-5M', 2190000, NULL, 10, NULL, 'https://www.ikea.com/ext/ingkadam/m/48b3fcdd56d82a15/original/US-0018831.jpg?f=xl', NULL, '2026-11-26 10:19:01', '2026-11-26 10:19:01'),
-(62, 76, '12-13', 'Cam / 3m', 'SP0076-MAU-CAM-KICH-THUOC-3M', 0, NULL, 10, NULL, NULL, NULL, '2026-11-26 10:30:07', '2026-11-26 10:45:05');
+(62, 76, '12-13', 'Cam / 3m', 'SP0076-MAU-CAM-KICH-THUOC-3M', 0, NULL, 10, NULL, NULL, NULL, '2026-11-26 10:30:07', '2026-11-26 10:45:05'),
+(63, 78, '14', 'Xám đen', NULL, 12000000, NULL, 10, NULL, 'https://www.ikea.com/us/en/images/p/6fbb0488a9aec41f/uppland-armchair-hakebo-dark-gray/PE920368.jpg?f=xl', NULL, '2026-11-28 00:36:49', '2026-11-28 00:36:49'),
+(64, 78, '15', 'Xám xanh', NULL, 12200000, NULL, 10, NULL, 'https://www.ikea.com/us/en/images/p/74b88daf673fe744/uppland-armchair-hakebo-gray-green/PE920354.jpg?f=xl', NULL, '2026-11-28 00:36:49', '2026-11-28 00:36:49'),
+(65, 78, '16', 'Sọc', NULL, 11000000, NULL, 10, NULL, 'https://www.ikea.com/us/en/images/p/2fa9c75f49e7493d/uppland-armchair-karlshov-beige-multicolor/PE920360.jpg?f=xl', NULL, '2026-11-28 00:36:49', '2026-11-28 00:36:49');
 
 -- --------------------------------------------------------
 
@@ -813,7 +869,10 @@ INSERT INTO `product_variant_values` (`id`, `variant_id`, `option_value_id`) VAL
 (16, 61, 5),
 (17, 61, 11),
 (18, 62, 12),
-(19, 62, 13);
+(19, 62, 13),
+(20, 63, 14),
+(21, 64, 15),
+(22, 65, 16);
 
 -- --------------------------------------------------------
 
@@ -1011,6 +1070,14 @@ ALTER TABLE `discount_types`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `guest_inquiries`
+--
+ALTER TABLE `guest_inquiries`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_guest_inquiries_phone` (`phone`),
+  ADD KEY `idx_guest_inquiries_created` (`created_at`);
+
+--
 -- Indexes for table `orders`
 --
 ALTER TABLE `orders`
@@ -1028,18 +1095,19 @@ ALTER TABLE `order_items`
   ADD KEY `fk_order_items_variants` (`variant_id`);
 
 --
+-- Indexes for table `order_returns`
+--
+ALTER TABLE `order_returns`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_order_returns_order` (`order_id`),
+  ADD KEY `idx_order_returns_user` (`user_id`);
+
+--
 -- Indexes for table `order_status`
 --
 ALTER TABLE `order_status`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_orders_order_status` (`order_id`);
-
---
--- Indexes for table `order_status_histories`
---
-ALTER TABLE `order_status_histories`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `order_status_histories_order_index` (`order_id`);
 
 --
 -- Indexes for table `payments`
@@ -1165,7 +1233,7 @@ ALTER TABLE `carts`
 -- AUTO_INCREMENT for table `cart_details`
 --
 ALTER TABLE `cart_details`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=86;
 
 --
 -- AUTO_INCREMENT for table `categories`
@@ -1177,7 +1245,7 @@ ALTER TABLE `categories`
 -- AUTO_INCREMENT for table `comments`
 --
 ALTER TABLE `comments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `discount_types`
@@ -1186,16 +1254,28 @@ ALTER TABLE `discount_types`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `guest_inquiries`
+--
+ALTER TABLE `guest_inquiries`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `order_items`
 --
 ALTER TABLE `order_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+
+--
+-- AUTO_INCREMENT for table `order_returns`
+--
+ALTER TABLE `order_returns`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `order_status`
@@ -1204,34 +1284,28 @@ ALTER TABLE `order_status`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `order_status_histories`
---
-ALTER TABLE `order_status_histories`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
-
---
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=78;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
 
 --
 -- AUTO_INCREMENT for table `product_options`
 --
 ALTER TABLE `product_options`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `product_option_values`
 --
 ALTER TABLE `product_option_values`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `product_status`
@@ -1243,13 +1317,13 @@ ALTER TABLE `product_status`
 -- AUTO_INCREMENT for table `product_variants`
 --
 ALTER TABLE `product_variants`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=63;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
 
 --
 -- AUTO_INCREMENT for table `product_variant_values`
 --
 ALTER TABLE `product_variant_values`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -1326,6 +1400,13 @@ ALTER TABLE `order_items`
   ADD CONSTRAINT `fk_order_items_orders` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`),
   ADD CONSTRAINT `fk_order_items_products` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`),
   ADD CONSTRAINT `fk_order_items_variants` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`);
+
+--
+-- Constraints for table `order_returns`
+--
+ALTER TABLE `order_returns`
+  ADD CONSTRAINT `fk_returns_orders` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`),
+  ADD CONSTRAINT `fk_returns_users` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
 --
 -- Constraints for table `order_status`

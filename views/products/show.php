@@ -117,7 +117,7 @@ $canReview = isset($canReview) ? (bool) $canReview : $isLoggedIn;
         <div class="product-info">
             <h1><?= e($product['name']) ?></h1>
             <p class="muted">SKU: <span data-variant-sku><?= e($product['sku'] ?? '—') ?></span></p>
-            <div class="price price-lg" data-variant-price>
+            <div class="price price-lg <?= $hasSale ? 'has-sale' : '' ?>" data-variant-price>
                 <strong><?= $hasVariants ? 'Từ ' : '' ?><?= money($final) ?></strong>
                 <?php if ($hasSale): ?><del><?= money($product['price']) ?></del><span class="tag tag-sale">Tiết kiệm <?= money((int) $product['price'] - $final) ?></span><?php endif ?>
             </div>

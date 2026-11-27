@@ -1,0 +1,6 @@
+[2026-11-27 22:41:38] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'noi_that_test_3' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}
+[2026-11-27 22:41:41] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'noi_that_test_3' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}
+[2026-11-27 22:41:43] app.ERROR: SQLSTATE[HY000] [1049] Unknown database 'noi_that_test_3' {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:50","url":"GET /"}
+[2026-11-27 22:43:14] app.ERROR: SQLSTATE[HY000]: General error: 1 no such table: guest_inquiries {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:63","url":"POST /checkout"}
+[2026-11-27 22:43:15] app.ERROR: SQLSTATE[HY000]: General error: 1 no such table: order_returns {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:63","url":"GET /admin"}
+[2026-11-27 22:43:15] app.ERROR: SQLSTATE[HY000]: General error: 1 no such table: guest_inquiries {"exception":"PDOException","file":"D:\\Documents\\Nhom_2_DuAn1\\du-an-1\\app\\Core\\Database.php:63","url":"POST /checkout"}

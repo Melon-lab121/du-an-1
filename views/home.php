@@ -1,107 +1,130 @@
-<?php $this->extend('layouts/main', ['title' => 'Trang chủ', 'description' => 'Mua sắm trực tuyến, thanh toán SePay an toàn.']) ?>
-
-<section class="hero">
-    <div class="container hero-inner">
-        <div>
-            <span class="badge">Mới · Ưu đãi tháng này</span>
-            <h1>Mua sắm thông minh,<br>thanh toán trong <em>3 giây</em>.</h1>
-            <p class="lead">Quét VietQR chuyển khoản, QR Napas hoặc thẻ qua SePay. Miễn phí giao hàng cho đơn từ <?= money(config('shop.free_shipping_threshold')) ?>.</p>
-            <div class="hero-actions">
-                <a class="btn btn-lg" href="<?= url('/products') ?>">Khám phá sản phẩm</a>
-                <a class="btn btn-lg btn-ghost" href="#featured">Sản phẩm nổi bật</a>
-            </div>
-        </div>
-        <div class="hero-art" aria-hidden="true">
-            <div class="orb orb-1"></div><div class="orb orb-2"></div>
-            <div class="glass-card">
-                <small>Thanh toán VietQR Napas 24/7</small>
-                <strong>Miễn phí vận chuyển toàn quốc</strong>
-                <span class="pill pill-success">SePay ✓</span>
-            </div>
-        </div>
-    </div>
-</section>
-
-<?php if ($categories): ?>
 <?php
-$getCategorySvg = function (string $slug, string $name): string {
-    $slugLower = strtolower($slug . ' ' . $name);
-    if (str_contains($slugLower, 'bed') || str_contains($slugLower, 'mattress') || str_contains($slugLower, 'giuong') || str_contains($slugLower, 'nem')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg>';
-    }
-    if (str_contains($slugLower, 'table') || str_contains($slugLower, 'chair') || str_contains($slugLower, 'ban') || str_contains($slugLower, 'ghe')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18M4 8v11M20 8v11M8 8v4M16 8v4"/></svg>';
-    }
-    if (str_contains($slugLower, 'sofa') || str_contains($slugLower, 'armchair') || str_contains($slugLower, 'couch')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v-5a3 3 0 0 1 6 0v5M4 11h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2zM6 19v2M18 19v2"/></svg>';
-    }
-    if (str_contains($slugLower, 'light') || str_contains($slugLower, 'lamp') || str_contains($slugLower, 'den')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21h6M12 3a6 6 0 0 0-4 10.45V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3.55A6 6 0 0 0 12 3z"/></svg>';
-    }
-    if (str_contains($slugLower, 'plant') || str_contains($slugLower, 'flower') || str_contains($slugLower, 'cay') || str_contains($slugLower, 'hoa')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a6 6 0 0 0-6-6H3v3a6 6 0 0 0 6 6h3M12 10a6 6 0 0 1 6-6h3v3a6 6 0 0 1-6 6h-3M12 10v11"/></svg>';
-    }
-    if (str_contains($slugLower, 'electronic') || str_contains($slugLower, 'phone') || str_contains($slugLower, 'laptop') || str_contains($slugLower, 'dien-tu')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
-    }
-    if (str_contains($slugLower, 'storage') || str_contains($slugLower, 'drawer') || str_contains($slugLower, 'dresser') || str_contains($slugLower, 'box') || str_contains($slugLower, 'tu') || str_contains($slugLower, 'ke')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 6v.01M9 12v.01M9 18v.01"/></svg>';
-    }
-    if (str_contains($slugLower, 'decor') || str_contains($slugLower, 'accessor') || str_contains($slugLower, 'trang-tri')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>';
-    }
-    if (str_contains($slugLower, 'kitchen') || str_contains($slugLower, 'appliance') || str_contains($slugLower, 'tableware') || str_contains($slugLower, 'bep')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a1 1 0 0 1 1 1v2a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6v-2a1 1 0 0 1 1-1zM9 4v3M15 4v3M12 4v3"/></svg>';
-    }
-    if (str_contains($slugLower, 'bath') || str_contains($slugLower, 'tam')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16a1 1 0 0 1 1 1v3a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5v-3a1 1 0 0 1 1-1zM6 12V5a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v2"/></svg>';
-    }
-    if (str_contains($slugLower, 'rug') || str_contains($slugLower, 'mat') || str_contains($slugLower, 'floor') || str_contains($slugLower, 'tham')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9h18M3 15h18"/></svg>';
-    }
-    if (str_contains($slugLower, 'baby') || str_contains($slugLower, 'kid') || str_contains($slugLower, 'tre-em')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M9 15c1 1.5 5 1.5 6 0"/></svg>';
-    }
-    if (str_contains($slugLower, 'smart')) {
-        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13a3 3 0 0 1 6 0M10.5 16a1.5 1.5 0 0 1 3 0"/></svg>';
-    }
-    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
-};
+$this->extend('layouts/main', ['title' => 'Trang chủ', 'description' => 'Nội thất phong cách Bắc Âu tối giản, thanh toán SePay an toàn.']);
+$heroSlides = array_values($featured ?: $latest);
+$heroMain = $heroSlides[0] ?? null;
+$heroSub1 = $heroSlides[1] ?? null;
+$heroSub2 = $heroSlides[2] ?? null;
 ?>
-<section class="container section" id="categories-section">
-    <div class="section-head category-head">
-        <h2>Danh mục nổi bật</h2>
-        <?php if (count($categories) > 5): ?>
-            <button type="button" class="btn btn-sm btn-ghost category-toggle-btn" data-category-toggle aria-expanded="false">
-                <span class="toggle-text">Xem tất cả (<?= count($categories) ?>)</span>
-                <span class="toggle-icon">▾</span>
-            </button>
-        <?php endif ?>
-    </div>
-    <div class="category-grid" data-category-grid data-expanded="false">
-        <?php foreach ($categories as $cat): ?>
-            <a class="category-tile" href="<?= route('category.show', ['slug' => $cat['slug']]) ?>">
-                <div class="category-icon" aria-hidden="true">
-                    <?= $getCategorySvg($cat['slug'] ?? '', $cat['name'] ?? '') ?>
+
+<section class="ikea-hero">
+    <div class="container">
+        <div class="ikea-bento">
+            <div class="ikea-hero-primary">
+                <div>
+                    <span class="ikea-hero-kicker">Ưu đãi tháng này</span>
+                    <h1>Thiết kế Bắc Âu,<br>cho mọi không gian.</h1>
+                    <p class="lead">
+                        Quét VietQR chuyển khoản, QR Napas hoặc thẻ qua SePay chỉ trong 3 giây.
+                        Miễn phí giao hàng cho đơn từ <?= money(config('shop.free_shipping_threshold')) ?>.
+                    </p>
                 </div>
-                <strong class="category-title"><?= e($cat['name']) ?></strong>
-                <span class="muted category-count"><?= (int) $cat['product_count'] ?> sản phẩm</span>
-            </a>
-        <?php endforeach ?>
-    </div>
-    <?php if (count($categories) > 5): ?>
-        <div class="category-collapse-footer" data-category-footer hidden>
-            <button type="button" class="btn btn-ghost category-collapse-bottom-btn" data-category-collapse-bottom>
-                Thu gọn ▴
-            </button>
+                <div class="ikea-hero-actions">
+                    <a class="btn btn-lg btn-hero-light" href="<?= url('/products') ?>">Khám phá sản phẩm</a>
+                    <a class="btn btn-lg btn-hero-outline" href="#featured">Sản phẩm nổi bật</a>
+                </div>
+            </div>
+
+            <div class="ikea-hero-mosaic">
+                <?php if ($heroMain !== null): ?>
+                    <?php $mainPrice = App\Services\PriceCalculator::unitPrice($heroMain); ?>
+                    <a class="ikea-hero-feature" href="<?= route('product.show', ['slug' => $heroMain['slug']]) ?>">
+                        <span class="ikea-tag-blue">Nổi bật</span>
+                        <?= $this->insert('partials/product-image', ['product' => $heroMain]) ?>
+                        <div class="ikea-scrim">
+                            <span class="ikea-scrim-title"><?= e($heroMain['name']) ?></span>
+                            <div class="ikea-scrim-meta">
+                                <span><?= !empty($heroMain['has_variants']) ? 'Từ ' : '' ?><?= money($mainPrice) ?></span>
+                                <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+                            </div>
+                        </div>
+                    </a>
+                <?php else: ?>
+                    <a class="ikea-hero-feature" href="<?= url('/products') ?>" style="background:#111111;">
+                        <div class="ikea-scrim">
+                            <span class="ikea-scrim-title">Bộ sưu tập nội thất mới</span>
+                            <div class="ikea-scrim-meta">
+                                <span>Xem toàn bộ sản phẩm</span>
+                                <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+                            </div>
+                        </div>
+                    </a>
+                <?php endif ?>
+
+                <div class="ikea-hero-subgrid">
+                    <?php foreach ([$heroSub1, $heroSub2] as $subItem): ?>
+                        <?php if ($subItem !== null): ?>
+                            <?php $subPrice = App\Services\PriceCalculator::unitPrice($subItem); ?>
+                            <a class="ikea-hero-tile" href="<?= route('product.show', ['slug' => $subItem['slug']]) ?>">
+                                <span class="ikea-tag-blue">Gợi ý hôm nay</span>
+                                <?= $this->insert('partials/product-image', ['product' => $subItem]) ?>
+                                <div class="ikea-scrim">
+                                    <span class="ikea-scrim-title"><?= e($subItem['name']) ?></span>
+                                    <div class="ikea-scrim-meta">
+                                        <span><?= !empty($subItem['has_variants']) ? 'Từ ' : '' ?><?= money($subPrice) ?></span>
+                                        <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+                                    </div>
+                                </div>
+                            </a>
+                        <?php else: ?>
+                            <a class="ikea-hero-tile" href="<?= url('/products') ?>" style="background:#f5f5f5;">
+                                <div class="ikea-scrim">
+                                    <span class="ikea-scrim-title">Xem thêm thiết kế mới</span>
+                                    <div class="ikea-scrim-meta">
+                                        <span>Tất cả sản phẩm</span>
+                                        <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+                                    </div>
+                                </div>
+                            </a>
+                        <?php endif ?>
+                    <?php endforeach ?>
+                </div>
+            </div>
         </div>
-    <?php endif ?>
+    </div>
 </section>
-<?php endif ?>
+
+<section class="container section">
+    <div class="section-head">
+        <h2>Trải nghiệm mua sắm tại <?= e($appName) ?></h2>
+    </div>
+    <div class="ikea-color-grid">
+        <a class="ikea-color-card is-blue" href="<?= url('/products') ?>">
+            <div>
+                <h3>Miễn phí giao hàng</h3>
+                <p>Áp dụng toàn quốc cho đơn hàng từ <?= money(config('shop.free_shipping_threshold')) ?>.</p>
+            </div>
+            <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="ikea-color-card is-red" href="<?= url('/cart') ?>">
+            <div>
+                <h3>Thanh toán SePay</h3>
+                <p>Quét VietQR, QR Napas hoặc thẻ ngân hàng xác nhận tự động.</p>
+            </div>
+            <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="ikea-color-card is-orange" href="<?= url('/cart') ?>">
+            <div>
+                <h3>Ưu đãi Voucher</h3>
+                <p>Chọn nhanh mã giảm giá và freeship ngay trong giỏ hàng.</p>
+            </div>
+            <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="ikea-color-card is-yellow" href="<?= url('/products?sort=price_asc') ?>">
+            <div>
+                <h3>Đổi trả trong 7 ngày</h3>
+                <p>An tâm kiểm tra, hỗ trợ minh chứng và hoàn tiền minh bạch.</p>
+            </div>
+            <span class="ikea-circle-arrow" aria-hidden="true">→</span>
+        </a>
+    </div>
+</section>
 
 <?php if ($featured): ?>
 <section class="container section" id="featured">
-    <div class="section-head"><h2>Nổi bật</h2><a href="<?= url('/products') ?>">Xem tất cả →</a></div>
+    <div class="section-head">
+        <h2>Sản phẩm nổi bật</h2>
+        <a class="section-link-pill" href="<?= url('/products') ?>">Xem tất cả →</a>
+    </div>
     <div class="product-grid">
         <?php foreach ($featured as $product): ?>
             <?= $this->insert('partials/product-card', ['product' => $product]) ?>
@@ -110,8 +133,11 @@ $getCategorySvg = function (string $slug, string $name): string {
 </section>
 <?php endif ?>
 
-<section class="container section">
-    <div class="section-head"><h2>Mới nhất</h2></div>
+<section class="container section" id="latest">
+    <div class="section-head">
+        <h2>Sản phẩm mới nhất</h2>
+        <a class="section-link-pill" href="<?= url('/products?sort=newest') ?>">Khám phá thêm →</a>
+    </div>
     <?php if ($latest): ?>
         <div class="product-grid">
             <?php foreach ($latest as $product): ?>
@@ -121,4 +147,36 @@ $getCategorySvg = function (string $slug, string $name): string {
     <?php else: ?>
         <div class="empty">Chưa có sản phẩm. Chạy <code>php cli.php install</code> để thêm dữ liệu mẫu.</div>
     <?php endif ?>
+</section>
+
+<section class="ikea-services-band">
+    <div class="container">
+        <div class="section-head">
+            <h2>Dịch vụ &amp; Hỗ trợ</h2>
+            <a class="section-link-pill" href="<?= url('/orders') ?>">Theo dõi đơn hàng</a>
+        </div>
+        <div class="ikea-services-grid">
+            <div class="ikea-service-card">
+                <span class="ikea-service-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                </span>
+                <h3>Giao hàng toàn quốc</h3>
+                <p>Theo dõi trạng thái đơn hàng theo từng chặng từ xác nhận đến giao thành công.</p>
+            </div>
+            <div class="ikea-service-card">
+                <span class="ikea-service-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                </span>
+                <h3>Thanh toán linh hoạt</h3>
+                <p>Hỗ trợ COD khi nhận hàng hoặc chuyển khoản nhanh VietQR qua cổng SePay.</p>
+            </div>
+            <div class="ikea-service-card">
+                <span class="ikea-service-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                </span>
+                <h3>Đổi trả 7 ngày</h3>
+                <p>Gửi yêu cầu trả hàng kèm ảnh minh chứng trực tiếp trong chi tiết đơn hàng.</p>
+            </div>
+        </div>
+    </div>
 </section>

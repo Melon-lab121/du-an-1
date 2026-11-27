@@ -355,13 +355,17 @@ T::test('Đặt hàng: tính tiền từ DB, trừ kho, tạo order_items', func
 
 T::test('Đặt hàng: hết hàng thì rollback toàn bộ (không trừ kho sản phẩm khác)', function () use ($app, $customer) {
     $a = product('sac-nhanh-gan-65w');
-    $b = product('laptop-workstation-15-i7');
+    $b = product('ban-phim-co-87-phim');
     $before = (int) $a['stock'];
     $orders = (int) $app->get(Database::class)->scalar('SELECT COUNT(*) FROM orders');
 
     T::throws(DomainException::class, fn () => $app->get(OrderService::class)->place($customer, [(int) $a['id'] => 1, (int) $b['id'] => 999], 'cod'), 'không đủ hàng');
     T::eq($before, (int) product('sac-nhanh-gan-65w')['stock']);
     T::eq($orders, (int) $app->get(Database::class)->scalar('SELECT COUNT(*) FROM orders'));
+
+    // Sản phẩm từ 10 triệu trở lên tối đa 3 cái mỗi đơn
+    $laptop = product('laptop-workstation-15-i7');
+    T::throws(DomainException::class, fn () => $app->get(OrderService::class)->place($customer, [(int) $laptop['id'] => 4], 'cod'), 'tối đa 3');
 });
 
 T::test('SePay IPN: thành công => đơn paid; gửi lại => 200 và không xử lý lại (idempotent)', function () use ($app, $customer) {
@@ -453,6 +457,19 @@ T::test('Huỷ đơn hoàn lại tồn kho, không đổi trạng thái sau khi 
     $orders->updateStatus((int) $order['id'], 'cancelled');
     T::eq($before, (int) product('chuot-khong-day-silent')['stock']);
     T::throws(DomainException::class, fn () => $orders->updateStatus((int) $order['id'], 'shipping'));
+
+    // Khách tự huỷ đơn qua HTTP POST /orders/{code}/cancel cũng phải hoàn lại tồn kho
+    $auth = $app->get(App\Services\Auth::class);
+    T::true($auth->attempt('customer@example.com', 'customer123'));
+    $user = $auth->user();
+    $order2 = $orders->place($customer, [(int) $p['id'] => 2], 'cod', (int) $user['id']);
+    T::eq($before - 2, (int) product('chuot-khong-day-silent')['stock']);
+    $token = $app->get(Csrf::class)->token();
+    $res = $app->handle(Request::create('POST', '/orders/' . $order2['code'] . '/cancel', ['_token' => $token]));
+    T::eq(302, $res->status());
+    T::eq('cancelled', Order::find((int) $order2['id'])['status']);
+    T::eq($before, (int) product('chuot-khong-day-silent')['stock']);
+    $auth->logout();
 });
 
 // ---------------------------------------------------------------- Xoá mềm
@@ -848,18 +865,14 @@ T::test('fillDailyBuckets điền ngày thiếu bằng 0', function () {
     T::eq([0, 2, 0], $filled['orders']);
 });
 
-T::test('Tổng quan lọc đơn, nhân viên và sản phẩm', function () use ($app, $db) {
+T::test('Tổng quan lọc đơn, gợi ý gom đơn, trả hàng và sản phẩm', function () use ($app, $db) {
     $stats = new DashboardStats($db);
     $before = $stats->orderStatusCounts();
 
     $now = date('Y-m-d H:i:s');
-    $highId = $db->insert('users', [
-        'name' => 'Nhân viên Cao', 'email' => 'staff-cao@example.com', 'password' => 'x',
-        'role' => 'staff', 'created_at' => $now, 'updated_at' => $now,
-    ]);
-    $lowId = $db->insert('users', [
-        'name' => 'Nhân viên Thấp', 'email' => 'staff-thap@example.com', 'password' => 'x',
-        'role' => 'staff', 'created_at' => $now, 'updated_at' => $now,
+    $userId = $db->insert('users', [
+        'name' => 'Khách lọc', 'email' => 'khach-loc@example.com', 'password' => 'x',
+        'role' => 'customer', 'created_at' => $now, 'updated_at' => $now,
     ]);
 
     $orderBase = [
@@ -867,16 +880,20 @@ T::test('Tổng quan lọc đơn, nhân viên và sản phẩm', function () use
         'shipping_address' => 'Q1', 'subtotal' => 0, 'shipping_fee' => 0, 'discount' => 0,
         'payment_method' => 'cod',
     ];
-    Order::create($orderBase + [
-        'code' => 'DASH-HIGH', 'user_id' => $highId, 'total' => 500000,
+    $highOrderId = Order::create($orderBase + [
+        'code' => 'DASH-HIGH', 'user_id' => $userId, 'total' => 500000,
         'payment_status' => 'paid', 'status' => 'completed',
     ]);
-    Order::create($orderBase + [
-        'code' => 'DASH-UNPAID', 'user_id' => $highId, 'total' => 900000,
+    $open1Id = Order::create($orderBase + [
+        'code' => 'DASH-OPEN-1', 'user_id' => $userId, 'total' => 900000,
         'payment_status' => 'unpaid', 'status' => 'pending',
     ]);
+    $open2Id = Order::create($orderBase + [
+        'code' => 'DASH-OPEN-2', 'user_id' => $userId, 'total' => 900000,
+        'payment_status' => 'unpaid', 'status' => 'confirmed',
+    ]);
     Order::create($orderBase + [
-        'code' => 'DASH-LOW', 'user_id' => $lowId, 'total' => 100000,
+        'code' => 'DASH-LOW', 'user_id' => $userId, 'total' => 100000,
         'payment_status' => 'paid', 'status' => 'cancelled',
     ]);
 
@@ -889,20 +906,6 @@ T::test('Tổng quan lọc đơn, nhân viên và sản phẩm', function () use
     T::true(in_array('DASH-HIGH', array_column($stats->ordersByStatus('completed', 20), 'code'), true));
     T::false(in_array('DASH-LOW', array_column($stats->ordersByStatus('completed', 20), 'code'), true));
 
-    $ranked = $stats->staffByRevenue('revenue_desc');
-    $positions = array_flip(array_column($ranked, 'id'));
-    T::true($positions[$highId] < $positions[$lowId]);
-    $byId = [];
-    foreach ($ranked as $row) {
-        $byId[$row['id']] = $row;
-    }
-    T::eq(500000, $byId[$highId]['revenue']);
-    T::eq(2, $byId[$highId]['order_count']);
-    T::eq(100000, $byId[$lowId]['revenue']);
-
-    $asc = array_flip(array_column($stats->staffByRevenue('revenue_asc'), 'id'));
-    T::true($asc[$lowId] < $asc[$highId]);
-
     $hot = product('tai-nghe-bluetooth-anc');
     $cold = product('chuot-khong-day-silent');
     Product::updateById((int) $cold['id'], ['stock' => 0]);
@@ -913,17 +916,45 @@ T::test('Tổng quan lọc đơn, nhân viên và sản phẩm', function () use
         }
     }
     $db->insert('order_items', [
-        'order_id' => (int) Order::findByCode('DASH-HIGH')['id'],
+        'order_id' => $highOrderId,
         'product_id' => (int) $hot['id'],
         'product_name' => $hot['name'],
         'price' => 990000,
         'quantity' => 40,
         'total' => 39600000,
     ]);
+    foreach ([$open1Id, $open2Id] as $oid) {
+        $db->insert('order_items', [
+            'order_id' => $oid,
+            'product_id' => (int) $hot['id'],
+            'product_name' => $hot['name'],
+            'price' => 990000,
+            'quantity' => 1,
+            'total' => 990000,
+        ]);
+    }
+
+    $merge = $stats->mergeGroups(20);
+    $mergeByPhone = array_values(array_filter($merge, static fn (array $m): bool => $m['customer_phone'] === '0900000001'));
+    T::eq(1, count($mergeByPhone), 'phải gom nhóm đơn mở cho SĐT 0900000001');
+    T::true(str_contains($mergeByPhone[0]['order_codes'], 'DASH-OPEN-1') && str_contains($mergeByPhone[0]['order_codes'], 'DASH-OPEN-2'), 'mã đơn gom nhóm');
+
+    $db->insert('order_returns', [
+        'order_id' => $highOrderId,
+        'user_id' => $userId,
+        'reason' => 'damaged',
+        'description' => 'Vỡ góc bàn test',
+        'proof_image' => '/uploads/returns/test.png',
+        'status' => 'pending',
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+    $returns = $stats->recentReturns(5);
+    T::true(in_array('DASH-HIGH', array_column($returns, 'order_code'), true));
 
     $bySold = $stats->productsFiltered('sold_desc', '', 30);
     T::eq((int) $hot['id'], $bySold[0]['id']);
-    T::eq($soldBefore + 40, $bySold[0]['sold']);
+    T::eq($soldBefore + 42, $bySold[0]['sold']);
 
     $outIds = array_column($stats->productsFiltered('stock_asc', 'out', 30), 'id');
     T::true(in_array((int) $cold['id'], $outIds, true));
@@ -938,14 +969,22 @@ T::test('Tổng quan lọc đơn, nhân viên và sản phẩm', function () use
     T::true($auth->attempt('admin@example.com', 'admin123'));
     $html = $app->handle(Request::create('GET', '/admin', [
         'order_status' => 'completed',
-        'staff_sort' => 'revenue_desc',
         'product_sort' => 'sold_desc',
         'stock' => 'low',
     ]))->content();
-    T::true(str_contains($html, 'Nhân viên theo doanh số'));
+    T::true(str_contains($html, 'Gợi ý gom đơn'));
+    T::true(str_contains($html, 'Lượt trả hàng gần đây'));
     T::true(str_contains($html, 'DASH-HIGH'));
-    T::true(str_contains($html, 'Nhân viên Cao'));
     T::false(str_contains($html, 'DASH-LOW'));
+
+    // Kiểm tra quản lý người dùng & xác nhận hoàn tiền không bị lỗi SQL/FK
+    $token = $app->get(Csrf::class)->token();
+    T::eq(200, $app->handle(Request::create('GET', '/admin/users'))->status());
+    T::eq(200, $app->handle(Request::create('GET', '/admin/users/' . $userId . '/orders'))->status());
+    T::eq(302, $app->handle(Request::create('POST', '/admin/orders/' . $highOrderId . '/refund', ['_token' => $token, 'refund_note' => 'OK']))->status());
+    T::eq('refunded', Order::find($highOrderId)['payment_status']);
+    T::eq(302, $app->handle(Request::create('POST', '/admin/users/' . $userId . '/delete', ['_token' => $token]))->status());
+    T::eq(null, App\Models\User::find($userId));
     $auth->logout();
 });
 

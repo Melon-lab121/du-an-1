@@ -17,6 +17,8 @@ $variantThumbs = array_values(array_filter(
     $cardVariants,
     static fn (array $v): bool => !empty($v['image'])
 ));
+$visibleThumbs = array_slice($variantThumbs, 0, 4);
+$extraThumbs = max(0, count($variantThumbs) - count($visibleThumbs));
 ?>
 <article class="product-card" id="<?= e($cardId) ?>">
     <a href="<?= $link ?>" class="product-thumb">
@@ -27,9 +29,9 @@ $variantThumbs = array_values(array_filter(
         <?php if ((int) $product['stock'] <= 0): ?><span class="tag tag-out">Hết hàng</span><?php endif ?>
     </a>
 
-    <?php if ($variantThumbs !== []): ?>
-        <div class="variant-thumb-strip" role="group" aria-label="Ảnh biến thể <?= e((string) $product['name']) ?>" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0;">
-            <?php foreach ($variantThumbs as $idx => $v): ?>
+    <?php if ($visibleThumbs !== []): ?>
+        <div class="variant-thumb-strip" role="group" aria-label="Ảnh biến thể <?= e((string) $product['name']) ?>">
+            <?php foreach ($visibleThumbs as $idx => $v): ?>
                 <?php
                 $vTitle = (string) ($v['title'] ?? 'Biến thể');
                 $vImg = (string) $v['image'];
@@ -42,7 +44,7 @@ $variantThumbs = array_values(array_filter(
                 ?>
                 <button
                     type="button"
-                    class="js-variant-thumb"
+                    class="js-variant-thumb <?= $idx === 0 ? 'is-active' : '' ?>"
                     data-target-card="<?= e($cardId) ?>"
                     data-variant-img="<?= e($vImg) ?>"
                     data-variant-title="<?= e($vTitle) ?>"
@@ -51,58 +53,49 @@ $variantThumbs = array_values(array_filter(
                     data-variant-stock="<?= $vStock ?>"
                     title="<?= e($vTitle) ?>"
                     aria-label="Xem biến thể <?= e($vTitle) ?>"
-                    style="padding:2px;border:1.5px solid <?= $idx === 0 ? 'var(--primary, #2563eb)' : 'var(--border, #e5e7eb)' ?>;border-radius:6px;background:#fff;cursor:pointer;line-height:0;"
                 >
-                    <img
-                        src="<?= e($vImg) ?>"
-                        alt="<?= e($vTitle) ?>"
-                        style="width:32px;height:32px;object-fit:cover;border-radius:4px;display:block;"
-                    >
+                    <img src="<?= e($vImg) ?>" alt="<?= e($vTitle) ?>">
                 </button>
             <?php endforeach ?>
+            <?php if ($extraThumbs > 0): ?>
+                <a href="<?= $link ?>" class="variant-more-count">+<?= $extraThumbs ?></a>
+            <?php endif ?>
         </div>
     <?php endif ?>
 
     <div class="product-body">
+        <?php if (!empty($product['has_variants'])): ?>
+            <span class="product-kicker"><?= count($cardVariants) ?> phân loại</span>
+        <?php elseif ($hasSale): ?>
+            <span class="product-kicker">Ưu đãi giá tốt</span>
+        <?php endif ?>
+
         <h3 class="product-name"><a href="<?= $link ?>"><?= e($product['name']) ?></a></h3>
 
-        <?php if ($cardVariants !== []): ?>
-            <div class="variant-labels muted small" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
-                <?php foreach ($cardVariants as $v): ?>
-                    <span
-                        class="variant-pill"
-                        style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surface-muted, #f3f4f6);border:1px solid var(--border, #e5e7eb);"
-                    ><?= e((string) ($v['title'] ?? '')) ?></span>
-                <?php endforeach ?>
-            </div>
+        <?php if (!empty($product['short_description'])): ?>
+            <p class="product-sub"><?= e((string) $product['short_description']) ?></p>
         <?php endif ?>
 
-        <div class="price">
-            <strong class="js-card-price"><?= $product['has_variants'] ? 'Từ ' : '' ?><?= money($final) ?></strong>
-            <?php if ($hasSale): ?><del><?= money($product['price']) ?></del><?php endif ?>
+        <div class="product-footer-row">
+            <div class="price <?= $hasSale ? 'has-sale' : '' ?>">
+                <strong class="js-card-price"><?= $product['has_variants'] ? 'Từ ' : '' ?><?= money($final) ?></strong>
+                <?php if ($hasSale): ?><del><?= money($product['price']) ?></del><?php endif ?>
+            </div>
+
+            <?php if ($product['has_variants']): ?>
+                <a class="btn-ikea-bag js-variant-detail-link" href="<?= $link ?>" title="Chọn phân loại" aria-label="Chọn phân loại <?= e($product['name']) ?>">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>
+                </a>
+            <?php else: ?>
+                <form action="<?= url('/cart/add') ?>" method="post" data-ajax-cart>
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="product_id" value="<?= (int) $product['id'] ?>">
+                    <button class="btn-ikea-bag" type="submit" title="Thêm vào giỏ hàng" aria-label="Thêm <?= e($product['name']) ?> vào giỏ" <?= (int) $product['stock'] <= 0 ? 'disabled' : '' ?>>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>
+                    </button>
+                </form>
+            <?php endif ?>
         </div>
-
-        <?php if ($product['has_variants']): ?>
-            <div class="product-card-actions">
-                <a class="btn-cart-icon js-variant-detail-link" href="<?= $link ?>" title="Chọn phân loại">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                </a>
-                <a class="btn-buy-now js-variant-detail-link" href="<?= $link ?>" title="Chọn phân loại">
-                    Thanh toán ngay
-                </a>
-            </div>
-        <?php else: ?>
-            <form action="<?= url('/cart/add') ?>" method="post" class="product-card-actions" data-ajax-cart>
-                <?= csrf_field() ?>
-                <input type="hidden" name="product_id" value="<?= (int) $product['id'] ?>">
-                <button class="btn-cart-icon" type="submit" title="Thêm vào giỏ hàng" <?= (int) $product['stock'] <= 0 ? 'disabled' : '' ?>>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                </button>
-                <button class="btn-buy-now" type="submit" name="buy_now" value="1" <?= (int) $product['stock'] <= 0 ? 'disabled' : '' ?>>
-                    Thanh toán ngay
-                </button>
-            </form>
-        <?php endif ?>
     </div>
 </article>
 
@@ -136,7 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         card.querySelectorAll('.js-variant-thumb').forEach((el) => {
-            el.style.borderColor = el === btn ? 'var(--primary, #2563eb)' : 'var(--border, #e5e7eb)';
+            el.classList.toggle('is-active', el === btn);
         });
     });
 });

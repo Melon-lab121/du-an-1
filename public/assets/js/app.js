@@ -143,50 +143,33 @@
         if (button) setTimeout(() => button.classList.add('loading'), 0);
     });
 
-    // Thu gọn / Mở rộng danh mục trang chủ
-    const catGrid = document.querySelector('[data-category-grid]');
-    const catToggleBtns = document.querySelectorAll('[data-category-toggle]');
-    const catBottomBtn = document.querySelector('[data-category-collapse-bottom]');
-    const catFooter = document.querySelector('[data-category-footer]');
-    const catSection = document.getElementById('categories-section');
+    // Thanh danh mục ghim mới: nút cuộn trái/phải mượt và tự đưa mục active vào vùng nhìn thấy
+    const catStrip = document.querySelector('[data-category-strip]');
+    const catPrev = document.querySelector('[data-cat-prev]');
+    const catNext = document.querySelector('[data-cat-next]');
 
-    if (catGrid) {
-        const totalCats = catGrid.children.length;
-
-        function setCategoryExpanded(expanded, shouldScroll = false) {
-            catGrid.setAttribute('data-expanded', expanded ? 'true' : 'false');
-
-            catToggleBtns.forEach((btn) => {
-                btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-                const textEl = btn.querySelector('.toggle-text');
-                const iconEl = btn.querySelector('.toggle-icon');
-                if (textEl) {
-                    textEl.textContent = expanded ? 'Thu gọn' : `Xem tất cả (${totalCats})`;
-                }
-                if (iconEl) {
-                    iconEl.textContent = expanded ? '▴' : '▾';
-                }
-            });
-
-            if (catFooter) {
-                catFooter.hidden = !expanded;
-            }
-
-            if (!expanded && shouldScroll && catSection) {
-                catSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+    if (catStrip) {
+        function syncCategoryArrows() {
+            const maxScroll = catStrip.scrollWidth - catStrip.clientWidth;
+            if (catPrev) catPrev.hidden = catStrip.scrollLeft <= 6;
+            if (catNext) catNext.hidden = maxScroll <= 6 || catStrip.scrollLeft >= maxScroll - 6;
         }
 
-        catToggleBtns.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const isExpanded = catGrid.getAttribute('data-expanded') === 'true';
-                setCategoryExpanded(!isExpanded);
-            });
+        catPrev?.addEventListener('click', () => {
+            catStrip.scrollBy({ left: -260, behavior: 'smooth' });
+        });
+        catNext?.addEventListener('click', () => {
+            catStrip.scrollBy({ left: 260, behavior: 'smooth' });
         });
 
-        catBottomBtn?.addEventListener('click', () => {
-            setCategoryExpanded(false, true);
-        });
+        catStrip.addEventListener('scroll', syncCategoryArrows, { passive: true });
+        window.addEventListener('resize', syncCategoryArrows);
+
+        const activeChip = catStrip.querySelector('.category-chip.active');
+        if (activeChip) {
+            activeChip.scrollIntoView({ inline: 'center', block: 'nearest' });
+        }
+        syncCategoryArrows();
     }
 
     // Giỏ hàng & Đặt hàng: chọn voucher từ select option tự động áp dụng / gỡ mã qua AJAX không tải lại trang

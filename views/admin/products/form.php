@@ -85,21 +85,18 @@ $productId = (int) ($product['id'] ?? 0);
     </aside>
 </form>
 
-<?php // HTML không cho lồng form: quản lý biến thể nằm tách biệt bên dưới 
-?>
+<?php // HTML không cho lồng form: quản lý biến thể nằm tách biệt bên dưới ?>
+<?php if ($isEdit): ?>
 <div class="card stack" id="product-variants-manager" style="margin-top:24px">
     <div class="toolbar" style="justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">Thêm và chỉnh sửa biến thể</h3>
-        <?php if ($isEdit): ?>
-            <a class="btn btn-sm btn-ghost" href="<?= url('/admin/products/' . $productId . '/variants/trash') ?>">
-                Thùng rác biến thể<?= $trashedVariants !== [] ? ' (' . count($trashedVariants) . ')' : '' ?>
-            </a>
-        <?php endif ?>
+        <a class="btn btn-sm btn-ghost" href="<?= url('/admin/products/' . $productId . '/variants/trash') ?>">
+            Thùng rác biến thể<?= $trashedVariants !== [] ? ' (' . count($trashedVariants) . ')' : '' ?>
+        </a>
     </div>
 
-    <?php // Form thêm nhiều biến thể trực tiếp (hỗ trợ cả tạo mới sản phẩm và chỉnh sửa) 
-    ?>
-    <form action="<?= url($isEdit ? '/admin/products/' . $productId . '/variants/batch' : '/admin/products/variants/draft') ?>" method="post" enctype="multipart/form-data" class="stack" id="add-multiple-variants-form" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border, #e5e7eb);">
+    <?php // Form thêm nhiều biến thể trực tiếp ?>
+    <form action="<?= url('/admin/products/' . $productId . '/variants/batch') ?>" method="post" enctype="multipart/form-data" class="stack" id="add-multiple-variants-form" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border, #e5e7eb);">
         <?= csrf_field() ?>
         <div class="toolbar" style="justify-content:space-between;align-items:center;">
             <div>
@@ -269,14 +266,16 @@ $productId = (int) ($product['id'] ?? 0);
                                 <td><?= (int) ($tv['stock'] ?? 0) ?></td>
                                 <td style="white-space:nowrap;">
                                     <div class="inline" style="gap:4px;">
-                                        <?php if ($isEdit && $trashedVariants !== []): ?>
-                                            <div class="toolbar" style="margin-top: 8px;padding-top:12px;border-top:1px solid var(--border, #e5e7eb);justify-content:space-between;align-items:center;">
-                                                <span class="muted small">Có <strong><?= count($trashedVariants) ?></strong> biến thể đã xoá mềm trong thùng rác.</span>
-                                                <a class="btn btn-sm btn-ghost" href="<?= url('/admin/products/' . $productId . '/variants/trash') ?>">
-                                                    Mở thùng rác biến thể →
-                                                </a>
-                                            </div>
-                                        <?php endif ?>
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm js-variant-action"
+                                            data-action="<?= url('/admin/products/' . $productId . '/variants/' . $tvId . '/restore') ?>">Khôi phục</button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-ghost js-variant-action"
+                                            data-action="<?= url('/admin/products/' . $productId . '/variants/' . $tvId . '/force-delete') ?>"
+                                            data-confirm="Xoá vĩnh viễn biến thể này khỏi database? Không thể khôi phục."
+                                            style="color:#dc2626;">Xoá hẳn</button>
                                     </div>
                                 </td>
                             </tr>
@@ -287,6 +286,11 @@ $productId = (int) ($product['id'] ?? 0);
         </details>
     <?php endif ?>
 </div>
+<?php else: ?>
+<div class="card" style="margin-top:24px">
+    <p class="muted" style="margin:0;">Sau khi lưu sản phẩm mới, bạn có thể vào trang <strong>Sửa sản phẩm</strong> để thêm và cấu hình các biến thể (màu sắc, kích thước, giá, tồn kho, ảnh riêng).</p>
+</div>
+<?php endif ?>
 
 <?php // Form ẩn dùng chung để gửi action từng biến thể (quick-update / soft-delete / restore / force-delete) không lồng form 
 ?>

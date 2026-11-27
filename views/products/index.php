@@ -38,7 +38,7 @@ $sorts = ['newest' => 'Mới nhất', 'price_asc' => 'Giá tăng dần', 'price_
                 <?php if ($filters['q'] !== ''): ?><input type="hidden" name="q" value="<?= e($filters['q']) ?>"><?php endif ?>
                 <input type="number" name="min_price" min="0" step="10000" placeholder="Từ" value="<?= e($filters['min_price'] ?? '') ?>">
                 <input type="number" name="max_price" min="0" step="10000" placeholder="Đến" value="<?= e($filters['max_price'] ?? '') ?>">
-                <button class="btn btn-sm" type="submit">Lọc</button>
+                <button class="btn btn-sm btn-block" type="submit">Áp dụng lọc</button>
             </form>
         </aside>
 
