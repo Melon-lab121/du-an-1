@@ -12,9 +12,9 @@ final class Order extends Model
         'pending' => 'Chờ xác nhận',
         'confirmed' => 'Đã xác nhận',
         'packing' => 'Đang đóng gói',
-        'awaiting_pickup' => 'Chờ đơn vị vận chuyển lấy',
-        'shipping' => 'Đang giao',
-        'delivered' => 'Đã giao',
+        'awaiting_pickup' => 'Đã giao cho đơn vị vận chuyển',
+        'shipping' => 'Đang giao hàng',
+        'delivered' => 'Giao hàng thành công',
         'completed' => 'Hoàn thành',
         'cancelled' => 'Đã huỷ',
     ];
@@ -47,6 +47,12 @@ final class Order extends Model
     public const DELIVERY_STAGES = ['awaiting_pickup', 'shipping'];
 
     public const MAX_DELIVERY_ATTEMPTS = 3;
+
+    /** Đơn "Giao hàng thành công" mà khách không xác nhận đã nhận hàng thì sau bấy nhiêu ngày tự chuyển Hoàn thành. */
+    public const AUTO_COMPLETE_DAYS = 14;
+
+    /** Trạng thái chỉ khách hàng được bấm (admin không đổi được): khách xác nhận đã nhận hàng => Hoàn thành. */
+    public const CUSTOMER_ONLY_STATUSES = ['completed'];
 
     protected static string $table = 'orders';
     protected static array $fillable = [
@@ -121,6 +127,16 @@ final class Order extends Model
             $next[] = 'cancelled';
         }
         return $next;
+    }
+
+    /**
+     * Như nextStatuses() nhưng bỏ các trạng thái chỉ khách được bấm (CUSTOMER_ONLY_STATUSES): dùng cho ô chọn của admin.
+     *
+     * @return array<int, string>
+     */
+    public static function adminNextStatuses(string $status, int $failedAttempts = 0): array
+    {
+        return array_values(array_diff(self::nextStatuses($status, $failedAttempts), self::CUSTOMER_ONLY_STATUSES));
     }
 
     public static function canTransition(string $from, string $to, int $failedAttempts = 0): bool

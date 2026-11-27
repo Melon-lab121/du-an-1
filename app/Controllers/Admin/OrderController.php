@@ -55,18 +55,29 @@ final class OrderController extends Controller
             'items' => Order::items($id),
             'payments' => Order::payments($id),
             'history' => Order::statusHistory($id),
-            'nextStatuses' => Order::nextStatuses((string) $order['status'], $failedAttempts),
+            'nextStatuses' => Order::adminNextStatuses((string) $order['status'], $failedAttempts),
             'failedAttempts' => $failedAttempts,
         ]);
     }
 
     public function updateStatus(Request $request, int $id): Response
     {
+        $status = (string) $request->input('status');
+        // "Hoàn thành" là việc của khách (xác nhận đã nhận hàng) hoặc hệ thống (tự động sau N ngày), admin không bấm được
+        if (in_array($status, Order::CUSTOMER_ONLY_STATUSES, true)) {
+            $this->flash('error', sprintf(
+                'Trạng thái "%s" do khách hàng xác nhận đã nhận hàng (hoặc tự động sau %d ngày), admin không đổi được.',
+                Order::statusLabel($status),
+                Order::AUTO_COMPLETE_DAYS,
+            ));
+            return $this->redirect('/admin/orders/' . $id);
+        }
+
         $note = trim((string) $request->input('note', ''));
         try {
             $this->orders->updateStatus(
                 $id,
-                (string) $request->input('status'),
+                $status,
                 changedBy: $this->auth->id(),
                 note: $note === '' ? null : mb_substr($note, 0, 255),
             );

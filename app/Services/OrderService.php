@@ -238,7 +238,7 @@ final class OrderService
             if ($status === 'cancelled' && $order['payment_status'] === 'paid') {
                 $changes['payment_status'] = 'refund_needed';
             }
-            // COD: giao thành công ("Đã giao") thì coi như đã thu tiền mặt (để doanh thu tính đủ đơn COD)
+            // COD: giao thành công ("Giao hàng thành công") thì coi như đã thu tiền mặt (để doanh thu tính đủ đơn COD)
             $codCollected = $status === 'delivered'
                 && $order['payment_method'] === 'cod'
                 && $order['payment_status'] === 'unpaid';
@@ -289,7 +289,11 @@ final class OrderService
             $order = $db->table('orders')->find($orderId) ?? throw new DomainException('Không tìm thấy đơn hàng.');
             $status = (string) $order['status'];
             if (!in_array($status, Order::DELIVERY_STAGES, true)) {
-                throw new DomainException('Chỉ ghi nhận thất bại khi đơn đang chờ lấy hàng hoặc đang giao.');
+                throw new DomainException(sprintf(
+                    'Chỉ ghi nhận thất bại khi đơn đang ở "%s" hoặc "%s".',
+                    Order::statusLabel('awaiting_pickup'),
+                    Order::statusLabel('shipping'),
+                ));
             }
 
             $attempt = Order::failedAttempts($orderId, $status) + 1;
@@ -307,13 +311,14 @@ final class OrderService
     }
 
     /**
-     * Tự hoàn thành các đơn 'delivered' đã quá $days ngày (tính từ lần chuyển sang 'delivered' gần nhất trong lịch sử)
-     * mà khách chưa xác nhận đã nhận hàng. Chạy bằng `php cli.php orders:autocomplete`, đặt lịch chạy mỗi ngày.
+     * Tự hoàn thành các đơn 'delivered' đã quá $days ngày (mặc định Order::AUTO_COMPLETE_DAYS; tính từ lần chuyển sang
+     * 'delivered' gần nhất trong lịch sử) mà khách chưa xác nhận đã nhận hàng. Chạy bằng
+     * `php cli.php orders:autocomplete`, đặt lịch chạy mỗi ngày.
      *
      * @param int|null $now mốc thời gian (Unix) để so sánh; mặc định là bây giờ (dùng cho test)
      * @return int số đơn đã được hoàn thành
      */
-    public function autoCompleteDelivered(int $days = 7, ?int $now = null): int
+    public function autoCompleteDelivered(int $days = Order::AUTO_COMPLETE_DAYS, ?int $now = null): int
     {
         $cutoff = date('Y-m-d H:i:s', ($now ?? time()) - $days * 86400);
         $rows = $this->db->select(
@@ -339,6 +344,33 @@ final class OrderService
             }
         }
         return $done;
+    }
+
+    /**
+     * Khách xác nhận ĐÃ NHẬN HÀNG: đơn 'delivered' chuyển sang 'completed'. Ngoài việc tự động sau
+     * Order::AUTO_COMPLETE_DAYS ngày thì đây là cách duy nhất để đơn hoàn thành (admin không được bấm, xem
+     * Admin\OrderController::updateStatus). Chỉ chủ đơn mới xác nhận được; gọi lại khi đơn đã hoàn thành thì bỏ qua.
+     *
+     * @throws DomainException đơn không phải của khách này, hoặc đơn chưa ở trạng thái "Giao hàng thành công"
+     */
+    public function confirmReceived(int $orderId, int $userId): void
+    {
+        $order = $this->db->table('orders')->find($orderId);
+        // Không phải đơn của khách này thì coi như không tồn tại (không lộ đơn của người khác)
+        if ($order === null || $order['user_id'] === null || (int) $order['user_id'] !== $userId) {
+            throw new DomainException('Không tìm thấy đơn hàng.');
+        }
+        if ($order['status'] === 'completed') {
+            return;
+        }
+        if ($order['status'] !== 'delivered') {
+            throw new DomainException(sprintf(
+                'Chỉ xác nhận đã nhận hàng khi đơn đã "%s" (hiện tại: "%s").',
+                Order::statusLabel('delivered'),
+                Order::statusLabel((string) $order['status']),
+            ));
+        }
+        $this->updateStatus($orderId, 'completed', $userId, 'Khách xác nhận đã nhận hàng');
     }
 
     /**

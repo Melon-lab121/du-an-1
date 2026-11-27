@@ -15,7 +15,7 @@ Thanh toán: COD và SePay (sandbox, checkout v1). Giao diện và thông báo b
 php tests/run.php            # chạy toàn bộ test (SQLite in-memory). PHẢI pass trước khi báo "xong"
 php cli.php migrate          # chạy migration mới
 php cli.php routes           # liệt kê route
-php cli.php orders:autocomplete  # tự hoàn thành đơn "Đã giao" quá 7 ngày (đặt lịch chạy mỗi ngày)
+php cli.php orders:autocomplete  # tự hoàn thành đơn "Giao hàng thành công" quá 14 ngày (đặt lịch chạy mỗi ngày)
 php cli.php make:module Ten  # tạo khung module
 php -l <file>                # kiểm tra cú pháp
 ```

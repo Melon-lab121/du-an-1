@@ -109,7 +109,11 @@ $this->extend('layouts/admin', ['title' => 'Đơn ' . $order['code'], 'heading' 
         <div class="card">
             <h3>Cập nhật trạng thái</h3>
             <?php if ($nextStatuses === []): ?>
-                <p class="muted">Đơn đang ở trạng thái cuối (<?= e(Order::statusLabel((string) $order['status'])) ?>), không thể đổi tiếp.</p>
+                <?php if ($order['status'] === 'delivered'): ?>
+                    <p class="muted">Đang chờ khách xác nhận đã nhận hàng. Nếu khách không xác nhận, đơn tự chuyển sang Hoàn thành sau <?= Order::AUTO_COMPLETE_DAYS ?> ngày kể từ lúc giao hàng thành công (admin không bấm được bước này).</p>
+                <?php else: ?>
+                    <p class="muted">Đơn đang ở trạng thái cuối (<?= e(Order::statusLabel((string) $order['status'])) ?>), không thể đổi tiếp.</p>
+                <?php endif ?>
             <?php else: ?>
                 <form action="<?= url('/admin/orders/' . (int) $order['id'] . '/status') ?>" method="post" class="stack">
                     <?= csrf_field() ?>

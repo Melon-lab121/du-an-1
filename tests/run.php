@@ -1192,7 +1192,7 @@ T::test('Thanh toán + cập nhật đơn cùng 1 transaction: lỗi giữa ch�
     }
 });
  
-T::test('COD: giao thành công (Đã giao) thì ghi nhận đã thu tiền; huỷ thì vẫn chưa thanh toán', function () use ($app, $customer) {
+T::test('COD: giao hàng thành công thì ghi nhận đã thu tiền; huỷ thì vẫn chưa thanh toán', function () use ($app, $customer) {
     $orders = $app->get(OrderService::class);
     $p = make_product('Tủ giày thử COD', 350000, 10);
  
@@ -1350,7 +1350,7 @@ T::test('Lấy/giao hàng thất bại lần 1, 2, 3: ghi lịch sử, giữ tr�
 
     // Chỉ ghi nhận được khi đang chờ lấy hàng / đang giao
     $early = $place();
-    T::throws(DomainException::class, fn () => $orders->recordDeliveryFailure($early), 'chờ lấy hàng');
+    T::throws(DomainException::class, fn () => $orders->recordDeliveryFailure($early), 'đơn vị vận chuyển');
 
     // Lấy hàng thất bại
     $id = $place();
@@ -1394,7 +1394,8 @@ T::test('Lấy/giao hàng thất bại lần 1, 2, 3: ghi lịch sử, giữ tr�
     T::eq('delivered', Order::find($id2)['status'], 'thất bại rồi vẫn giao được');
 });
 
-T::test('Tự hoàn thành: đơn "Đã giao" quá 7 ngày mà khách chưa xác nhận thì tự chuyển Hoàn thành', function () use ($app, $db, $customer) {
+T::test('Tự hoàn thành: đơn "Giao hàng thành công" quá 14 ngày mà khách chưa xác nhận thì tự chuyển Hoàn thành', function () use ($app, $db, $customer) {
+    T::eq(14, Order::AUTO_COMPLETE_DAYS, 'chị trưởng nhóm: 2 tuần');
     $orders = $app->get(OrderService::class);
     $p = make_product('Giường ngủ thử tự hoàn thành', 1200000, 20);
     $deliver = function (array $steps) use ($orders, $customer, $p): int {
@@ -1414,23 +1415,23 @@ T::test('Tự hoàn thành: đơn "Đã giao" quá 7 ngày mà khách chưa xác
     $recent = $deliver($toDelivered);
     $shipping = $deliver(['confirmed', 'packing', 'awaiting_pickup', 'shipping']);
     $confirmedByCustomer = $deliver($toDelivered);
-    $backdate($old, 8);
-    $backdate($recent, 6);
-    $backdate($confirmedByCustomer, 10);
+    $backdate($old, 15);
+    $backdate($recent, 13);
+    $backdate($confirmedByCustomer, 20);
     $orders->updateStatus($confirmedByCustomer, 'completed', null, 'Khách xác nhận đã nhận hàng');
 
     T::eq(1, $orders->autoCompleteDelivered());
     T::eq('completed', Order::find($old)['status']);
-    T::eq('delivered', Order::find($recent)['status'], 'mới 6 ngày thì chưa tự hoàn thành');
+    T::eq('delivered', Order::find($recent)['status'], 'mới 13 ngày thì chưa tự hoàn thành');
     T::eq('shipping', Order::find($shipping)['status'], 'chưa giao thì không đụng tới');
     $last = array_slice(Order::statusHistory($old), -1)[0];
     T::eq('completed', $last['to_status']);
     T::eq(null, $last['changed_by'], 'hệ thống tự đổi');
-    T::true(str_contains((string) $last['note'], '7 ngày'));
+    T::true(str_contains((string) $last['note'], '14 ngày'));
     T::eq('Khách xác nhận đã nhận hàng', array_slice(Order::statusHistory($confirmedByCustomer), -1)[0]['note'], 'đơn khách đã xác nhận thì không bị ghi đè');
 
     T::eq(0, $orders->autoCompleteDelivered(), 'chạy lại không xử lý lại');
-    T::eq(1, $orders->autoCompleteDelivered(7, time() + 2 * 86400), 'thêm 2 ngày nữa thì đơn 6 ngày tuổi cũng đủ 7 ngày');
+    T::eq(1, $orders->autoCompleteDelivered(14, time() + 2 * 86400), 'thêm 2 ngày nữa thì đơn 13 ngày tuổi cũng đủ 14 ngày');
     T::eq('completed', Order::find($recent)['status']);
 });
 
@@ -1472,6 +1473,55 @@ T::test('Admin: nút ghi nhận thất bại hiện khi chờ lấy/đang giao; 
     } finally {
         $app->get(App\Services\Auth::class)->logout();
     }
+});
+
+T::test('Hoàn thành: chỉ khách (chủ đơn) xác nhận được khi đã giao thành công; admin không bấm được', function () use ($app, $customer) {
+    $orders = $app->get(OrderService::class);
+    $owner = App\Models\User::findBy('email', 'customer@example.com');
+    $admin = App\Models\User::findBy('email', 'admin@example.com');
+    $p = make_product('Bàn trà thử khách xác nhận', 700000, 10);
+    $id = (int) $orders->place($customer, [(int) $p['id'] => 1], 'cod', (int) $owner['id'])['id'];
+
+    // Ô chọn của admin không bao giờ có "Hoàn thành"
+    T::eq(['shipping'], Order::adminNextStatuses('awaiting_pickup'));
+    T::eq(['delivered'], Order::adminNextStatuses('shipping'));
+    T::eq([], Order::adminNextStatuses('delivered'), 'đã giao thì chỉ chờ khách xác nhận');
+    T::eq(['completed'], Order::nextStatuses('delivered'), 'quy trình vẫn cho delivered -> completed (cho khách/hệ thống)');
+
+    // Chưa giao thành công: khách chưa xác nhận được
+    T::throws(DomainException::class, fn () => $orders->confirmReceived($id, (int) $owner['id']), 'Chỉ xác nhận đã nhận hàng');
+    walk_order($orders, $id, ['confirmed', 'packing', 'awaiting_pickup', 'shipping', 'delivered']);
+
+    // Không phải chủ đơn (kể cả admin) thì không xác nhận được
+    T::throws(DomainException::class, fn () => $orders->confirmReceived($id, (int) $admin['id']), 'Không tìm thấy');
+    T::eq('delivered', Order::find($id)['status']);
+
+    // Admin: trang đơn không có lựa chọn Hoàn thành; gọi thẳng POST cũng bị chặn
+    $app->get(App\Services\Auth::class)->login($admin);
+    try {
+        $token = $app->get(Csrf::class)->token();
+        $html = $app->handle(Request::create('GET', '/admin/orders/' . $id))->content();
+        T::false(str_contains($html, 'value="completed"'), 'admin không có lựa chọn Hoàn thành');
+        T::true(str_contains($html, 'Đang chờ khách xác nhận'), 'trang admin giải thích đang chờ khách');
+        $res = $app->handle(Request::create('POST', '/admin/orders/' . $id . '/status', ['_token' => $token, 'status' => 'completed']));
+        T::eq(302, $res->status());
+        T::eq('delivered', Order::find($id)['status'], 'admin POST thẳng cũng không hoàn thành được');
+    } finally {
+        $app->get(App\Services\Auth::class)->logout();
+    }
+
+    // Chủ đơn xác nhận: Hoàn thành, lịch sử ghi đúng khách
+    $orders->confirmReceived($id, (int) $owner['id']);
+    T::eq('completed', Order::find($id)['status']);
+    $last = array_slice(Order::statusHistory($id), -1)[0];
+    T::eq('completed', $last['to_status']);
+    T::eq((int) $owner['id'], (int) $last['changed_by'], 'ghi đúng khách đã xác nhận');
+    T::eq('Khách xác nhận đã nhận hàng', $last['note']);
+
+    // Gọi lại: không lỗi, không ghi thêm lịch sử
+    $count = count(Order::statusHistory($id));
+    $orders->confirmReceived($id, (int) $owner['id']);
+    T::eq($count, count(Order::statusHistory($id)));
 });
 
 exit(T::run());
